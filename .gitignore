@@ -1,0 +1,34 @@
+**/.vs/*
+**/*.vcxproj.user
+**/Win32/*
+**/x86/*
+**/x64/*
+**/generators/*
+**/run/*
+**/results/*
+**/export/*
+out/*
+**/Release/*
+**/Debug/*
+**/logs/*
+**/__pycache__/*
+
+
+**/*.dll
+**/*.lib
+
+# Visual C++ cache files
+ipch/
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+
+# Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+*.sap
