@@ -1,5 +1,7 @@
 # Resty
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
 一个面向 Windows 的轻量级工作休息提醒工具，目标是：
 
 - 尽量只产出一个 exe
