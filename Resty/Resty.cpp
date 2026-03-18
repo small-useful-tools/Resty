@@ -37,6 +37,7 @@ constexpr COLORREF kCardBorder = RGB(224, 231, 255);
 constexpr COLORREF kAccentColor = RGB(59, 130, 246);
 constexpr COLORREF kPrimaryText = RGB(30, 41, 59);
 constexpr COLORREF kSecondaryText = RGB(100, 116, 139);
+constexpr int kActionButtonCornerRadius = 14;
 
 void SetWindowTextSafe(HWND hwnd, const std::wstring& value)
 {
@@ -107,6 +108,14 @@ void DrawRoundedCard(HDC dc, const RECT& rect, COLORREF fill, COLORREF border, i
     SelectObject(dc, oldPen);
     DeleteObject(brush);
     DeleteObject(pen);
+}
+
+void DrawCardWithShadow(HDC dc, const RECT& rect, int radius)
+{
+    RECT shadow = rect;
+    OffsetRect(&shadow, 0, 4);
+    DrawRoundedCard(dc, shadow, kCardBorder, kCardBorder, radius);
+    DrawRoundedCard(dc, rect, kCardBackground, kCardBorder, radius);
 }
 
 void ApplyEditTheme(HWND edit, const wchar_t* cueBanner)
@@ -267,11 +276,21 @@ private:
         IdRuleAdd,
         IdRuleUpdate,
         IdRuleDelete,
+        IdSettingsNavRules,
+        IdSettingsNavReminder,
+        IdSettingsNavSystem,
         IdSettingsSave,
         IdSettingsClose,
         IdTrayShowMain,
         IdTrayShowSettings,
         IdTrayExit,
+    };
+
+    enum class SettingsSection
+    {
+        Rules,
+        Reminder,
+        System,
     };
 
     bool RegisterWindowClasses() const
@@ -306,6 +325,7 @@ private:
 
         WNDCLASSEXW overlayClass = {};
         overlayClass.cbSize = sizeof(overlayClass);
+        overlayClass.style = CS_DBLCLKS;
         overlayClass.hInstance = instance_;
         overlayClass.lpfnWndProc = OverlayWindowProc;
         overlayClass.lpszClassName = kOverlayClassName;
@@ -372,13 +392,10 @@ private:
         storageLabel_ = CreateWindowExW(0, L"STATIC", L"本地存储", WS_CHILD | WS_VISIBLE, 56, 344, 180, 24, hwnd, nullptr, instance_, nullptr);
         summaryValue_ = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 56, 376, 472, 68, hwnd, reinterpret_cast<HMENU>(IdSummaryValue), instance_, nullptr);
         actionLabel_ = CreateWindowExW(0, L"STATIC", L"快速操作", WS_CHILD | WS_VISIBLE, 580, 344, 180, 24, hwnd, nullptr, instance_, nullptr);
-
-        openSettingsButton_ = CreateWindowExW(0, L"BUTTON", L"打开设置", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 580, 376, 108, 40, hwnd, reinterpret_cast<HMENU>(IdOpenSettings), instance_, nullptr);
-        previewShortButton_ = CreateWindowExW(0, L"BUTTON", L"预览小休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 700, 376, 108, 40, hwnd, reinterpret_cast<HMENU>(IdPreviewShort), instance_, nullptr);
-        previewLongButton_ = CreateWindowExW(0, L"BUTTON", L"预览大休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 580, 424, 228, 40, hwnd, reinterpret_cast<HMENU>(IdPreviewLong), instance_, nullptr);
+        openSettingsButton_ = CreateWindowExW(0, L"BUTTON", L"打开设置", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 580, 376, 228, 40, hwnd, reinterpret_cast<HMENU>(IdOpenSettings), instance_, nullptr);
 
         for (HWND child : { mainTitleLabel_, mainSubtitleLabel_, countdownLabel_, countdownValue_, countdownHintLabel_, nextLabel_, nextValue_,
-            nextHintLabel_, storageLabel_, summaryValue_, actionLabel_, openSettingsButton_, previewShortButton_, previewLongButton_ })
+            nextHintLabel_, storageLabel_, summaryValue_, actionLabel_, openSettingsButton_ })
         {
             SetControlFont(child, baseFont_);
         }
@@ -503,69 +520,79 @@ private:
         settingsTitleLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"Resty 设置", WS_CHILD | WS_VISIBLE, 24, 20, 220, 34, hwnd, nullptr, instance_, nullptr);
         settingsSubtitleLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"系统行为、提醒样式和规则文件都可以在这里维护。", WS_CHILD | WS_VISIBLE, 24, 56, 420, 22, hwnd, nullptr, instance_, nullptr);
 
-        CreateWindowExW(0, L"BUTTON", L"常规", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 92, 792, 84, hwnd, nullptr, instance_, nullptr);
-        startupCheck_ = CreateWindowExW(0, L"BUTTON", L"开机自启动", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 124, 160, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsStartup), instance_, nullptr);
-        trayCheck_ = CreateWindowExW(0, L"BUTTON", L"关闭主窗口时最小化到托盘", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 248, 124, 280, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsTray), instance_, nullptr);
+        navRulesButton_ = CreateWindowExW(0, L"BUTTON", L"休息规则", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 24, 96, 148, 38, hwnd, reinterpret_cast<HMENU>(IdSettingsNavRules), instance_, nullptr);
+        navReminderButton_ = CreateWindowExW(0, L"BUTTON", L"提醒设置", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 184, 96, 148, 38, hwnd, reinterpret_cast<HMENU>(IdSettingsNavReminder), instance_, nullptr);
+        navSystemButton_ = CreateWindowExW(0, L"BUTTON", L"系统", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 344, 96, 148, 38, hwnd, reinterpret_cast<HMENU>(IdSettingsNavSystem), instance_, nullptr);
 
-        CreateWindowExW(0, L"BUTTON", L"小休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 190, 792, 124, hwnd, nullptr, instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 226, 120, 20, hwnd, nullptr, instance_, nullptr);
-        shortOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 220, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortOpacity), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 226, 110, 20, hwnd, nullptr, instance_, nullptr);
-        shortColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 220, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortColor), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 266, 60, 20, hwnd, nullptr, instance_, nullptr);
-        shortMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 108, 260, 684, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortMessage), instance_, nullptr);
+        systemGroupBox_ = CreateWindowExW(0, L"BUTTON", L"系统", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 126, hwnd, nullptr, instance_, nullptr);
+        startupCheck_ = CreateWindowExW(0, L"BUTTON", L"开机自启动", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 190, 160, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsStartup), instance_, nullptr);
+        trayCheck_ = CreateWindowExW(0, L"BUTTON", L"关闭主窗口时最小化到托盘", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 224, 280, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsTray), instance_, nullptr);
 
-        CreateWindowExW(0, L"BUTTON", L"大休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 328, 792, 124, hwnd, nullptr, instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 364, 120, 20, hwnd, nullptr, instance_, nullptr);
-        longOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 358, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongOpacity), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 364, 110, 20, hwnd, nullptr, instance_, nullptr);
-        longColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 358, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongColor), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 404, 60, 20, hwnd, nullptr, instance_, nullptr);
-        longMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 108, 398, 684, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongMessage), instance_, nullptr);
+        shortGroupBox_ = CreateWindowExW(0, L"BUTTON", L"小休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 150, hwnd, nullptr, instance_, nullptr);
+        shortOpacityLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 188, 120, 20, hwnd, nullptr, instance_, nullptr);
+        shortOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 182, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortOpacity), instance_, nullptr);
+        shortColorLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 188, 110, 20, hwnd, nullptr, instance_, nullptr);
+        shortColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 182, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortColor), instance_, nullptr);
+        shortMessageLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 232, 60, 20, hwnd, nullptr, instance_, nullptr);
+        shortMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 226, 622, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortMessage), instance_, nullptr);
+        previewShortButton_ = CreateWindowExW(0, L"BUTTON", L"预览小休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 664, 258, 128, 36, hwnd, reinterpret_cast<HMENU>(IdPreviewShort), instance_, nullptr);
+        shortValidationHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 270, 600, 20, hwnd, nullptr, instance_, nullptr);
 
-        CreateWindowExW(0, L"BUTTON", L"休息规则", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 466, 792, 256, hwnd, nullptr, instance_, nullptr);
-        settingsHelpLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"使用下方时间段编辑器维护规则，保存时仍会写回 .resty/data/rest.txt。", WS_CHILD | WS_VISIBLE, 48, 500, 700, 20, hwnd, nullptr, instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"已配置时间段", WS_CHILD | WS_VISIBLE, 48, 532, 130, 20, hwnd, nullptr, instance_, nullptr);
+        longGroupBox_ = CreateWindowExW(0, L"BUTTON", L"大休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 320, 792, 150, hwnd, nullptr, instance_, nullptr);
+        longOpacityLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 356, 120, 20, hwnd, nullptr, instance_, nullptr);
+        longOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 350, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongOpacity), instance_, nullptr);
+        longColorLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 356, 110, 20, hwnd, nullptr, instance_, nullptr);
+        longColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 350, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongColor), instance_, nullptr);
+        longMessageLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 400, 60, 20, hwnd, nullptr, instance_, nullptr);
+        longMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 394, 622, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongMessage), instance_, nullptr);
+        previewLongButton_ = CreateWindowExW(0, L"BUTTON", L"预览大休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 664, 426, 128, 36, hwnd, reinterpret_cast<HMENU>(IdPreviewLong), instance_, nullptr);
+        longValidationHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 438, 600, 20, hwnd, nullptr, instance_, nullptr);
+
+        rulesGroupBox_ = CreateWindowExW(0, L"BUTTON", L"休息规则", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 566, hwnd, nullptr, instance_, nullptr);
+        settingsHelpLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"使用下方时间段编辑器维护规则，保存时仍会写回 .resty/data/rest.txt。", WS_CHILD | WS_VISIBLE, 48, 184, 700, 20, hwnd, nullptr, instance_, nullptr);
+        ruleListLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"已配置时间段", WS_CHILD | WS_VISIBLE, 48, 218, 130, 20, hwnd, nullptr, instance_, nullptr);
         ruleListBox_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
-            48, 558, 314, 120, hwnd, reinterpret_cast<HMENU>(IdRuleList), instance_, nullptr);
+            48, 244, 314, 400, hwnd, reinterpret_cast<HMENU>(IdRuleList), instance_, nullptr);
 
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"休息类型", WS_CHILD | WS_VISIBLE, 390, 532, 80, 20, hwnd, nullptr, instance_, nullptr);
+        ruleKindLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"休息类型", WS_CHILD | WS_VISIBLE, 390, 218, 80, 20, hwnd, nullptr, instance_, nullptr);
         ruleKindCombo_ = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST,
-            390, 556, 112, 240, hwnd, reinterpret_cast<HMENU>(IdRuleKind), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"规则类型", WS_CHILD | WS_VISIBLE, 522, 532, 80, 20, hwnd, nullptr, instance_, nullptr);
+            390, 244, 112, 240, hwnd, reinterpret_cast<HMENU>(IdRuleKind), instance_, nullptr);
+        ruleModeLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"规则类型", WS_CHILD | WS_VISIBLE, 522, 218, 80, 20, hwnd, nullptr, instance_, nullptr);
         ruleModeCombo_ = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST,
-            522, 556, 128, 240, hwnd, reinterpret_cast<HMENU>(IdRuleMode), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"时间(HH:MM)", WS_CHILD | WS_VISIBLE, 658, 532, 84, 20, hwnd, nullptr, instance_, nullptr);
+            522, 244, 128, 240, hwnd, reinterpret_cast<HMENU>(IdRuleMode), instance_, nullptr);
+        ruleTimeLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"时间(HH:MM)", WS_CHILD | WS_VISIBLE, 658, 218, 84, 20, hwnd, nullptr, instance_, nullptr);
         ruleTimeEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-            658, 556, 84, 32, hwnd, reinterpret_cast<HMENU>(IdRuleTime), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"时长(分钟)", WS_CHILD | WS_VISIBLE, 748, 532, 72, 20, hwnd, nullptr, instance_, nullptr);
+            658, 244, 84, 32, hwnd, reinterpret_cast<HMENU>(IdRuleTime), instance_, nullptr);
+        ruleDurationLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"时长(分钟)", WS_CHILD | WS_VISIBLE, 748, 218, 72, 20, hwnd, nullptr, instance_, nullptr);
         ruleDurationEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-            748, 556, 44, 32, hwnd, reinterpret_cast<HMENU>(IdRuleDuration), instance_, nullptr);
+            748, 244, 44, 32, hwnd, reinterpret_cast<HMENU>(IdRuleDuration), instance_, nullptr);
 
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"固定日期", WS_CHILD | WS_VISIBLE, 390, 598, 80, 20, hwnd, nullptr, instance_, nullptr);
+        ruleDateLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"固定日期", WS_CHILD | WS_VISIBLE, 390, 298, 80, 20, hwnd, nullptr, instance_, nullptr);
         ruleDateEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-            390, 622, 170, 32, hwnd, reinterpret_cast<HMENU>(IdRuleDate), instance_, nullptr);
-        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"星期重复", WS_CHILD | WS_VISIBLE, 584, 598, 80, 20, hwnd, nullptr, instance_, nullptr);
+            390, 324, 170, 32, hwnd, reinterpret_cast<HMENU>(IdRuleDate), instance_, nullptr);
+        ruleWeekdayLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"星期重复", WS_CHILD | WS_VISIBLE, 584, 298, 80, 20, hwnd, nullptr, instance_, nullptr);
 
-        ruleWeekdayChecks_[0] = CreateWindowExW(0, L"BUTTON", L"日", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 584, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdaySun), instance_, nullptr);
-        ruleWeekdayChecks_[1] = CreateWindowExW(0, L"BUTTON", L"一", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 620, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayMon), instance_, nullptr);
-        ruleWeekdayChecks_[2] = CreateWindowExW(0, L"BUTTON", L"二", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 656, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayTue), instance_, nullptr);
-        ruleWeekdayChecks_[3] = CreateWindowExW(0, L"BUTTON", L"三", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 692, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayWed), instance_, nullptr);
-        ruleWeekdayChecks_[4] = CreateWindowExW(0, L"BUTTON", L"四", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 728, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayThu), instance_, nullptr);
-        ruleWeekdayChecks_[5] = CreateWindowExW(0, L"BUTTON", L"五", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 584, 650, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayFri), instance_, nullptr);
-        ruleWeekdayChecks_[6] = CreateWindowExW(0, L"BUTTON", L"六", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 620, 650, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdaySat), instance_, nullptr);
+        ruleWeekdayChecks_[0] = CreateWindowExW(0, L"BUTTON", L"日", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 584, 324, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdaySun), instance_, nullptr);
+        ruleWeekdayChecks_[1] = CreateWindowExW(0, L"BUTTON", L"一", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 620, 324, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayMon), instance_, nullptr);
+        ruleWeekdayChecks_[2] = CreateWindowExW(0, L"BUTTON", L"二", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 656, 324, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayTue), instance_, nullptr);
+        ruleWeekdayChecks_[3] = CreateWindowExW(0, L"BUTTON", L"三", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 692, 324, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayWed), instance_, nullptr);
+        ruleWeekdayChecks_[4] = CreateWindowExW(0, L"BUTTON", L"四", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 728, 324, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayThu), instance_, nullptr);
+        ruleWeekdayChecks_[5] = CreateWindowExW(0, L"BUTTON", L"五", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 584, 350, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayFri), instance_, nullptr);
+        ruleWeekdayChecks_[6] = CreateWindowExW(0, L"BUTTON", L"六", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 620, 350, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdaySat), instance_, nullptr);
 
-        ruleAddButton_ = CreateWindowExW(0, L"BUTTON", L"新增时间段", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 390, 682, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleAdd), instance_, nullptr);
-        ruleUpdateButton_ = CreateWindowExW(0, L"BUTTON", L"更新选中", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 520, 682, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleUpdate), instance_, nullptr);
-        ruleDeleteButton_ = CreateWindowExW(0, L"BUTTON", L"删除选中", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 650, 682, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleDelete), instance_, nullptr);
+        ruleAddButton_ = CreateWindowExW(0, L"BUTTON", L"新增时间段", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 390, 394, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleAdd), instance_, nullptr);
+        ruleUpdateButton_ = CreateWindowExW(0, L"BUTTON", L"更新选中", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 520, 394, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleUpdate), instance_, nullptr);
+        ruleDeleteButton_ = CreateWindowExW(0, L"BUTTON", L"删除选中", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 650, 394, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleDelete), instance_, nullptr);
 
-        settingsPathHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"支持每天、每周、固定日期；最终仍会按原文本格式保存。", WS_CHILD | WS_VISIBLE, 48, 686, 320, 20, hwnd, nullptr, instance_, nullptr);
+        settingsPathHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"支持每天、每周、固定日期；最终仍会按原文本格式保存。", WS_CHILD | WS_VISIBLE, 48, 658, 320, 20, hwnd, nullptr, instance_, nullptr);
 
         saveButton_ = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 616, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsSave), instance_, nullptr);
         closeButton_ = CreateWindowExW(0, L"BUTTON", L"关闭", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 720, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsClose), instance_, nullptr);
 
-        for (HWND child : { settingsTitleLabel_, settingsSubtitleLabel_, startupCheck_, trayCheck_, shortOpacityEdit_, shortColorEdit_, shortMessageEdit_,
-            longOpacityEdit_, longColorEdit_, longMessageEdit_, settingsHelpLabel_, ruleListBox_, ruleKindCombo_, ruleModeCombo_, ruleTimeEdit_, ruleDurationEdit_, ruleDateEdit_,
+        for (HWND child : { settingsTitleLabel_, settingsSubtitleLabel_, navRulesButton_, navReminderButton_, navSystemButton_, systemGroupBox_, startupCheck_, trayCheck_,
+            shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_, previewShortButton_, shortValidationHintLabel_,
+            longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, previewLongButton_, longValidationHintLabel_,
+            rulesGroupBox_, settingsHelpLabel_, ruleListLabel_, ruleListBox_, ruleKindLabel_, ruleKindCombo_, ruleModeLabel_, ruleModeCombo_, ruleTimeLabel_, ruleTimeEdit_, ruleDurationLabel_, ruleDurationEdit_, ruleDateLabel_, ruleDateEdit_, ruleWeekdayLabel_,
             ruleWeekdayChecks_[0], ruleWeekdayChecks_[1], ruleWeekdayChecks_[2], ruleWeekdayChecks_[3], ruleWeekdayChecks_[4], ruleWeekdayChecks_[5], ruleWeekdayChecks_[6],
             ruleAddButton_, ruleUpdateButton_, ruleDeleteButton_, settingsPathHintLabel_, saveButton_, closeButton_ })
         {
@@ -574,6 +601,11 @@ private:
 
         SetControlFont(settingsTitleLabel_, titleFont_);
         SetControlFont(settingsSubtitleLabel_, captionFont_);
+        SetControlFont(navRulesButton_, sectionFont_);
+        SetControlFont(navReminderButton_, sectionFont_);
+        SetControlFont(navSystemButton_, sectionFont_);
+        SetControlFont(shortValidationHintLabel_, captionFont_);
+        SetControlFont(longValidationHintLabel_, captionFont_);
         SetControlFont(settingsHelpLabel_, captionFont_);
         SetControlFont(settingsPathHintLabel_, captionFont_);
 
@@ -595,6 +627,9 @@ private:
         SendMessageW(ruleModeCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"每天"));
         SendMessageW(ruleModeCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"每周"));
         SendMessageW(ruleModeCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"固定日期"));
+
+        UpdateReminderValidationHints();
+        SetSettingsSection(currentSettingsSection_);
     }
 
     void DrawSettingsWindow(HWND hwnd) const
@@ -607,6 +642,10 @@ private:
         FillSolidRect(dc, client, kWindowBackground);
         const RECT accentPill = { 24, 14, 132, 20 };
         DrawRoundedCard(dc, accentPill, kAccentColor, kAccentColor, 8);
+        const RECT navBaseline = { 24, 136, 816, 138 };
+        FillSolidRect(dc, navBaseline, kCardBorder);
+        const RECT contentCard = { 18, 146, 822, 724 };
+        DrawCardWithShadow(dc, contentCard, 22);
         EndPaint(hwnd, &paint);
     }
 
@@ -643,6 +682,61 @@ private:
         }
     }
 
+    std::wstring BuildReminderValidationHint(HWND opacityEdit, HWND colorEdit, bool& valid) const
+    {
+        const std::wstring opacityText = resty::Trim(GetWindowTextString(opacityEdit));
+        const std::wstring colorText = resty::Trim(GetWindowTextString(colorEdit));
+
+        if (opacityText.empty())
+        {
+            valid = false;
+            return L"透明度不能为空，范围 40-255。";
+        }
+
+        size_t parsedLength = 0;
+        int opacity = 0;
+        try
+        {
+            opacity = std::stoi(opacityText, &parsedLength);
+        }
+        catch (...)
+        {
+            valid = false;
+            return L"透明度必须是整数，范围 40-255。";
+        }
+
+        if (parsedLength != opacityText.size() || opacity < 40 || opacity > 255)
+        {
+            valid = false;
+            return L"透明度必须是整数，范围 40-255。";
+        }
+
+        COLORREF color = 0;
+        if (colorText.empty() || !resty::ParseColor(colorText, color))
+        {
+            valid = false;
+            return L"颜色格式无效，请使用 #RRGGBB。";
+        }
+
+        valid = true;
+        return L"输入格式正确。";
+    }
+
+    void UpdateReminderValidationHints()
+    {
+        if (settingsWindow_ == nullptr)
+        {
+            return;
+        }
+
+        std::wstring shortHint = BuildReminderValidationHint(shortOpacityEdit_, shortColorEdit_, shortReminderInputsValid_);
+        std::wstring longHint = BuildReminderValidationHint(longOpacityEdit_, longColorEdit_, longReminderInputsValid_);
+        SetWindowTextSafe(shortValidationHintLabel_, L"小休息：" + shortHint);
+        SetWindowTextSafe(longValidationHintLabel_, L"大休息：" + longHint);
+        InvalidateRect(shortValidationHintLabel_, nullptr, TRUE);
+        InvalidateRect(longValidationHintLabel_, nullptr, TRUE);
+    }
+
     void ResetRuleEditor()
     {
         SendMessageW(ruleKindCombo_, CB_SETCURSEL, 0, 0);
@@ -652,6 +746,40 @@ private:
         SetWindowTextW(ruleDateEdit_, L"");
         SetWeekdayMaskToEditor((1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5));
         UpdateRuleEditorEnabledState();
+    }
+
+    void ShowControls(const std::initializer_list<HWND>& controls, bool visible)
+    {
+        for (HWND control : controls)
+        {
+            if (control != nullptr)
+            {
+                ShowWindow(control, visible ? SW_SHOWNA : SW_HIDE);
+            }
+        }
+    }
+
+    void SetSettingsSection(SettingsSection section)
+    {
+        currentSettingsSection_ = section;
+
+        const bool showRules = section == SettingsSection::Rules;
+        const bool showReminder = section == SettingsSection::Reminder;
+        const bool showSystem = section == SettingsSection::System;
+
+        ShowControls({ systemGroupBox_, startupCheck_, trayCheck_ }, showSystem);
+        ShowControls({ shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_,
+            previewShortButton_, shortValidationHintLabel_, longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, previewLongButton_, longValidationHintLabel_ }, showReminder);
+        ShowControls({ rulesGroupBox_, settingsHelpLabel_, ruleListLabel_, ruleListBox_, ruleKindLabel_, ruleKindCombo_, ruleModeLabel_, ruleModeCombo_, ruleTimeLabel_, ruleTimeEdit_,
+            ruleDurationLabel_, ruleDurationEdit_, ruleDateLabel_, ruleDateEdit_, ruleWeekdayLabel_, ruleWeekdayChecks_[0], ruleWeekdayChecks_[1], ruleWeekdayChecks_[2],
+            ruleWeekdayChecks_[3], ruleWeekdayChecks_[4], ruleWeekdayChecks_[5], ruleWeekdayChecks_[6], ruleAddButton_, ruleUpdateButton_, ruleDeleteButton_, settingsPathHintLabel_ }, showRules);
+
+        if (settingsWindow_ != nullptr)
+        {
+            InvalidateRect(navRulesButton_, nullptr, TRUE);
+            InvalidateRect(navReminderButton_, nullptr, TRUE);
+            InvalidateRect(navSystemButton_, nullptr, TRUE);
+        }
     }
 
     int GetRuleSortPriority(resty::RuleMode mode) const
@@ -883,6 +1011,8 @@ private:
         ruleDrafts_ = settings_.rules;
         SortRuleDrafts();
         RefreshRuleList();
+        UpdateReminderValidationHints();
+        SetSettingsSection(currentSettingsSection_);
         if (!ruleDrafts_.empty())
         {
             SendMessageW(ruleListBox_, LB_SETCURSEL, 0, 0);
@@ -1084,7 +1214,7 @@ private:
         const __time64_t remaining = std::max(static_cast<__time64_t>(0), overlayDeadline_ - ToTimeT(now));
         const std::wstring title = overlayKind_ == resty::RestKind::Short ? L"小休息时间" : L"大休息时间";
         const std::wstring countdownText = (overlayPreviewMode_ ? L"预览剩余 " : L"本次休息剩余 ") + resty::FormatCountdown(remaining);
-        const std::wstring footer = (overlayPreviewMode_ ? L"预览模式" : (L"建议休息 " + std::to_wstring(overlayPlannedDurationMinutes_) + L" 分钟")) + L" · 点击任意位置关闭";
+        const std::wstring footer = (overlayPreviewMode_ ? L"预览模式" : (L"建议休息 " + std::to_wstring(overlayPlannedDurationMinutes_) + L" 分钟")) + L" · 双击任意位置关闭";
 
         RECT panel = client;
         if (overlayKind_ == resty::RestKind::Long)
@@ -1165,7 +1295,20 @@ private:
 
     bool IsPrimaryButton(UINT controlId) const
     {
-        return controlId == IdOpenSettings || controlId == IdSettingsSave || controlId == IdPreviewLong;
+        if (controlId == IdSettingsNavRules)
+        {
+            return currentSettingsSection_ == SettingsSection::Rules;
+        }
+        if (controlId == IdSettingsNavReminder)
+        {
+            return currentSettingsSection_ == SettingsSection::Reminder;
+        }
+        if (controlId == IdSettingsNavSystem)
+        {
+            return currentSettingsSection_ == SettingsSection::System;
+        }
+
+        return controlId == IdOpenSettings || controlId == IdSettingsSave || controlId == IdPreviewShort || controlId == IdPreviewLong;
     }
 
     LRESULT HandleDrawItem(LPARAM lParam) const
@@ -1177,9 +1320,42 @@ private:
         }
 
         const bool isPrimary = IsPrimaryButton(drawItem->CtlID);
+        const bool isNavButton = drawItem->CtlID == IdSettingsNavRules || drawItem->CtlID == IdSettingsNavReminder || drawItem->CtlID == IdSettingsNavSystem;
         const bool isPressed = (drawItem->itemState & ODS_SELECTED) != 0;
         const bool isFocused = (drawItem->itemState & ODS_FOCUS) != 0;
         const bool isDisabled = (drawItem->itemState & ODS_DISABLED) != 0;
+
+        RECT rect = drawItem->rcItem;
+        HDC dc = drawItem->hDC;
+        SetBkMode(dc, TRANSPARENT);
+
+        if (isNavButton)
+        {
+            const COLORREF navFill = isPressed ? kCardBackground : kWindowBackground;
+            const COLORREF navBorder = isPrimary ? kCardBorder : kWindowBackground;
+            const COLORREF navText = isDisabled ? RGB(148, 163, 184) : (isPrimary ? kAccentColor : kSecondaryText);
+
+            DrawRoundedCard(dc, rect, navFill, navBorder, 10);
+            RECT lineRect = rect;
+            lineRect.top = std::max(lineRect.top, lineRect.bottom - 4);
+            lineRect.bottom -= 1;
+            FillSolidRect(dc, lineRect, isPrimary ? kAccentColor : kCardBorder);
+
+            if (isFocused)
+            {
+                RECT focusRect = rect;
+                InflateRect(&focusRect, -4, -4);
+                DrawFocusRect(dc, &focusRect);
+            }
+
+            wchar_t text[64] = {};
+            GetWindowTextW(drawItem->hwndItem, text, static_cast<int>(std::size(text)));
+            SetTextColor(dc, navText);
+            HFONT oldFont = static_cast<HFONT>(SelectObject(dc, sectionFont_));
+            DrawTextW(dc, text, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(dc, oldFont);
+            return TRUE;
+        }
 
         COLORREF fillColor = isPrimary ? RGB(59, 130, 246) : RGB(255, 255, 255);
         COLORREF borderColor = isPrimary ? RGB(37, 99, 235) : RGB(203, 213, 225);
@@ -1187,7 +1363,8 @@ private:
 
         if (isPressed)
         {
-            fillColor = isPrimary ? RGB(37, 99, 235) : RGB(241, 245, 249);
+            fillColor = isPrimary ? RGB(30, 84, 200) : RGB(232, 238, 247);
+            borderColor = isPrimary ? RGB(30, 84, 200) : RGB(186, 199, 214);
         }
         if (isDisabled)
         {
@@ -1196,10 +1373,12 @@ private:
             textColor = RGB(148, 163, 184);
         }
 
-        RECT rect = drawItem->rcItem;
-        HDC dc = drawItem->hDC;
-        SetBkMode(dc, TRANSPARENT);
-        DrawRoundedCard(dc, rect, fillColor, borderColor, 16);
+        if (isPressed && !isDisabled)
+        {
+            OffsetRect(&rect, 0, 1);
+        }
+
+        DrawRoundedCard(dc, rect, fillColor, borderColor, kActionButtonCornerRadius);
 
         if (isFocused)
         {
@@ -1307,12 +1486,6 @@ private:
             case IdTrayShowSettings:
                 OpenSettingsWindow();
                 return 0;
-            case IdPreviewShort:
-                ShowOverlay(resty::RestKind::Short, kShortOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Short));
-                return 0;
-            case IdPreviewLong:
-                ShowOverlay(resty::RestKind::Long, kLongOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Long));
-                return 0;
             case IdTrayShowMain:
                 ShowMainWindow();
                 return 0;
@@ -1408,13 +1581,37 @@ private:
             {
                 SetTextColor(dc, kPrimaryText);
                 SetBkColor(dc, kWindowBackground);
+                return reinterpret_cast<INT_PTR>(windowBrush_);
             }
-            else
+            if (control == settingsSubtitleLabel_)
             {
                 SetTextColor(dc, kSecondaryText);
                 SetBkColor(dc, kWindowBackground);
+                return reinterpret_cast<INT_PTR>(windowBrush_);
             }
-            return reinterpret_cast<INT_PTR>(windowBrush_);
+            if (control == shortValidationHintLabel_)
+            {
+                SetTextColor(dc, shortReminderInputsValid_ ? kAccentColor : kSecondaryText);
+                SetBkColor(dc, kCardBackground);
+                return reinterpret_cast<INT_PTR>(cardBrush_);
+            }
+            if (control == longValidationHintLabel_)
+            {
+                SetTextColor(dc, longReminderInputsValid_ ? kAccentColor : kSecondaryText);
+                SetBkColor(dc, kCardBackground);
+                return reinterpret_cast<INT_PTR>(cardBrush_);
+            }
+            SetTextColor(dc, kSecondaryText);
+            SetBkColor(dc, kCardBackground);
+            return reinterpret_cast<INT_PTR>(cardBrush_);
+        }
+
+        case WM_CTLCOLORBTN:
+        {
+            HDC dc = reinterpret_cast<HDC>(wParam);
+            SetBkMode(dc, TRANSPARENT);
+            SetBkColor(dc, kCardBackground);
+            return reinterpret_cast<INT_PTR>(cardBrush_);
         }
 
         case WM_CTLCOLOREDIT:
@@ -1441,6 +1638,31 @@ private:
         case WM_COMMAND:
             switch (LOWORD(wParam))
             {
+            case IdSettingsNavRules:
+                SetSettingsSection(SettingsSection::Rules);
+                return 0;
+            case IdSettingsNavReminder:
+                SetSettingsSection(SettingsSection::Reminder);
+                return 0;
+            case IdSettingsNavSystem:
+                SetSettingsSection(SettingsSection::System);
+                return 0;
+            case IdSettingsShortOpacity:
+            case IdSettingsShortColor:
+            case IdSettingsLongOpacity:
+            case IdSettingsLongColor:
+                if (HIWORD(wParam) == EN_CHANGE)
+                {
+                    UpdateReminderValidationHints();
+                    return 0;
+                }
+                break;
+            case IdPreviewShort:
+                ShowOverlay(resty::RestKind::Short, kShortOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Short));
+                return 0;
+            case IdPreviewLong:
+                ShowOverlay(resty::RestKind::Long, kLongOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Long));
+                return 0;
             case IdRuleList:
                 if (HIWORD(wParam) == LBN_SELCHANGE)
                 {
@@ -1571,8 +1793,8 @@ private:
             }
             break;
 
-        case WM_LBUTTONDOWN:
-        case WM_RBUTTONDOWN:
+        case WM_LBUTTONDBLCLK:
+        case WM_RBUTTONDBLCLK:
             DestroyWindow(hwnd);
             return 0;
 
@@ -1677,8 +1899,30 @@ private:
 
     HWND settingsTitleLabel_ = nullptr;
     HWND settingsSubtitleLabel_ = nullptr;
+    HWND navRulesButton_ = nullptr;
+    HWND navReminderButton_ = nullptr;
+    HWND navSystemButton_ = nullptr;
+    HWND systemGroupBox_ = nullptr;
+    HWND shortGroupBox_ = nullptr;
+    HWND shortOpacityLabel_ = nullptr;
+    HWND shortColorLabel_ = nullptr;
+    HWND shortMessageLabel_ = nullptr;
+    HWND shortValidationHintLabel_ = nullptr;
+    HWND longGroupBox_ = nullptr;
+    HWND longOpacityLabel_ = nullptr;
+    HWND longColorLabel_ = nullptr;
+    HWND longMessageLabel_ = nullptr;
+    HWND longValidationHintLabel_ = nullptr;
+    HWND rulesGroupBox_ = nullptr;
     HWND settingsHelpLabel_ = nullptr;
     HWND settingsPathHintLabel_ = nullptr;
+    HWND ruleListLabel_ = nullptr;
+    HWND ruleKindLabel_ = nullptr;
+    HWND ruleModeLabel_ = nullptr;
+    HWND ruleTimeLabel_ = nullptr;
+    HWND ruleDurationLabel_ = nullptr;
+    HWND ruleDateLabel_ = nullptr;
+    HWND ruleWeekdayLabel_ = nullptr;
     HWND startupCheck_ = nullptr;
     HWND trayCheck_ = nullptr;
     HWND shortOpacityEdit_ = nullptr;
@@ -1721,6 +1965,9 @@ private:
     int overlayDurationSeconds_ = 0;
     int overlayPlannedDurationMinutes_ = 0;
     bool overlayPreviewMode_ = false;
+    bool shortReminderInputsValid_ = false;
+    bool longReminderInputsValid_ = false;
+    SettingsSection currentSettingsSection_ = SettingsSection::Rules;
     std::wstring lastDueKey_;
     bool isExiting_ = false;
 };
