@@ -130,9 +130,10 @@ void ApplyEditTheme(HWND edit, const wchar_t* cueBanner)
     SendMessageW(edit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(cueBanner));
 }
 
-HICON LoadAppIcon(HINSTANCE instance)
+HICON LoadAppIcon(HINSTANCE instance, int preferredSize)
 {
-    HICON icon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_RESTY_APP));
+    const int size = std::max(16, preferredSize);
+    HICON icon = reinterpret_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_RESTY_APP), IMAGE_ICON, size, size, LR_DEFAULTCOLOR | LR_SHARED));
     if (icon == nullptr)
     {
         icon = LoadIconW(nullptr, IDI_APPLICATION);
@@ -190,8 +191,12 @@ public:
 
     int Run(int nCmdShow)
     {
-        ShowWindow(mainWindow_, nCmdShow);
-        UpdateWindow(mainWindow_);
+        const int initialShowMode = settings_.openMainWindowOnLaunch ? nCmdShow : SW_HIDE;
+        ShowWindow(mainWindow_, initialShowMode);
+        if (settings_.openMainWindowOnLaunch)
+        {
+            UpdateWindow(mainWindow_);
+        }
 
         MSG message = {};
         while (GetMessageW(&message, nullptr, 0, 0) > 0)
@@ -252,6 +257,7 @@ private:
         IdPreviewShort,
         IdPreviewLong,
         IdSettingsStartup,
+        IdSettingsOpenMainWindow,
         IdSettingsTray,
         IdSettingsShortOpacity,
         IdSettingsShortMessage,
@@ -295,6 +301,9 @@ private:
 
     bool RegisterWindowClasses() const
     {
+        const int largeIconSize = std::max(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
+        const int smallIconSize = std::max(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+
         WNDCLASSEXW mainClass = {};
         mainClass.cbSize = sizeof(mainClass);
         mainClass.hInstance = instance_;
@@ -302,8 +311,8 @@ private:
         mainClass.lpszClassName = kMainClassName;
         mainClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         mainClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-        mainClass.hIcon = LoadAppIcon(instance_);
-        mainClass.hIconSm = LoadAppIcon(instance_);
+        mainClass.hIcon = LoadAppIcon(instance_, largeIconSize);
+        mainClass.hIconSm = LoadAppIcon(instance_, smallIconSize);
         if (RegisterClassExW(&mainClass) == 0)
         {
             return false;
@@ -316,8 +325,8 @@ private:
         settingsClass.lpszClassName = kSettingsClassName;
         settingsClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         settingsClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-        settingsClass.hIcon = LoadAppIcon(instance_);
-        settingsClass.hIconSm = LoadAppIcon(instance_);
+        settingsClass.hIcon = LoadAppIcon(instance_, largeIconSize);
+        settingsClass.hIconSm = LoadAppIcon(instance_, smallIconSize);
         if (RegisterClassExW(&settingsClass) == 0)
         {
             return false;
@@ -451,7 +460,8 @@ private:
         trayIcon_.uID = 1;
         trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         trayIcon_.uCallbackMessage = kTrayMessage;
-        trayIcon_.hIcon = LoadAppIcon(instance_);
+        const int trayIconSize = std::max(GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON));
+        trayIcon_.hIcon = LoadAppIcon(instance_, trayIconSize);
         wcscpy_s(trayIcon_.szTip, L"Resty - 工作休息提醒");
         Shell_NotifyIconW(NIM_ADD, &trayIcon_);
     }
@@ -524,9 +534,10 @@ private:
         navReminderButton_ = CreateWindowExW(0, L"BUTTON", L"提醒设置", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 184, 96, 148, 38, hwnd, reinterpret_cast<HMENU>(IdSettingsNavReminder), instance_, nullptr);
         navSystemButton_ = CreateWindowExW(0, L"BUTTON", L"系统", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 344, 96, 148, 38, hwnd, reinterpret_cast<HMENU>(IdSettingsNavSystem), instance_, nullptr);
 
-        systemGroupBox_ = CreateWindowExW(0, L"BUTTON", L"系统", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 126, hwnd, nullptr, instance_, nullptr);
+        systemGroupBox_ = CreateWindowExW(0, L"BUTTON", L"系统", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 160, hwnd, nullptr, instance_, nullptr);
         startupCheck_ = CreateWindowExW(0, L"BUTTON", L"开机自启动", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 190, 160, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsStartup), instance_, nullptr);
-        trayCheck_ = CreateWindowExW(0, L"BUTTON", L"关闭主窗口时最小化到托盘", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 224, 280, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsTray), instance_, nullptr);
+        openMainWindowCheck_ = CreateWindowExW(0, L"BUTTON", L"启动时打开主页面（默认开启）", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 224, 250, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsOpenMainWindow), instance_, nullptr);
+        trayCheck_ = CreateWindowExW(0, L"BUTTON", L"关闭主窗口时最小化到托盘", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 258, 280, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsTray), instance_, nullptr);
 
         shortGroupBox_ = CreateWindowExW(0, L"BUTTON", L"小休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 150, hwnd, nullptr, instance_, nullptr);
         shortOpacityLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 188, 120, 20, hwnd, nullptr, instance_, nullptr);
@@ -589,7 +600,7 @@ private:
         saveButton_ = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 616, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsSave), instance_, nullptr);
         closeButton_ = CreateWindowExW(0, L"BUTTON", L"关闭", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 720, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsClose), instance_, nullptr);
 
-        for (HWND child : { settingsTitleLabel_, settingsSubtitleLabel_, navRulesButton_, navReminderButton_, navSystemButton_, systemGroupBox_, startupCheck_, trayCheck_,
+        for (HWND child : { settingsTitleLabel_, settingsSubtitleLabel_, navRulesButton_, navReminderButton_, navSystemButton_, systemGroupBox_, startupCheck_, openMainWindowCheck_, trayCheck_,
             shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_, previewShortButton_, shortValidationHintLabel_,
             longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, previewLongButton_, longValidationHintLabel_,
             rulesGroupBox_, settingsHelpLabel_, ruleListLabel_, ruleListBox_, ruleKindLabel_, ruleKindCombo_, ruleModeLabel_, ruleModeCombo_, ruleTimeLabel_, ruleTimeEdit_, ruleDurationLabel_, ruleDurationEdit_, ruleDateLabel_, ruleDateEdit_, ruleWeekdayLabel_,
@@ -767,7 +778,7 @@ private:
         const bool showReminder = section == SettingsSection::Reminder;
         const bool showSystem = section == SettingsSection::System;
 
-        ShowControls({ systemGroupBox_, startupCheck_, trayCheck_ }, showSystem);
+        ShowControls({ systemGroupBox_, startupCheck_, openMainWindowCheck_, trayCheck_ }, showSystem);
         ShowControls({ shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_,
             previewShortButton_, shortValidationHintLabel_, longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, previewLongButton_, longValidationHintLabel_ }, showReminder);
         ShowControls({ rulesGroupBox_, settingsHelpLabel_, ruleListLabel_, ruleListBox_, ruleKindLabel_, ruleKindCombo_, ruleModeLabel_, ruleModeCombo_, ruleTimeLabel_, ruleTimeEdit_,
@@ -1000,6 +1011,7 @@ private:
         }
 
         SendMessageW(startupCheck_, BM_SETCHECK, settings_.launchAtStartup ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessageW(openMainWindowCheck_, BM_SETCHECK, settings_.openMainWindowOnLaunch ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessageW(trayCheck_, BM_SETCHECK, settings_.minimizeToTray ? BST_CHECKED : BST_UNCHECKED, 0);
         SetWindowTextW(shortOpacityEdit_, std::to_wstring(settings_.shortRest.opacity).c_str());
         SetWindowTextW(shortColorEdit_, resty::FormatColor(settings_.shortRest.color).c_str());
@@ -1028,6 +1040,7 @@ private:
     {
         resty::AppSettings updated = settings_;
         updated.launchAtStartup = SendMessageW(startupCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+        updated.openMainWindowOnLaunch = SendMessageW(openMainWindowCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
         updated.minimizeToTray = SendMessageW(trayCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
 
         try
@@ -1924,6 +1937,7 @@ private:
     HWND ruleDateLabel_ = nullptr;
     HWND ruleWeekdayLabel_ = nullptr;
     HWND startupCheck_ = nullptr;
+    HWND openMainWindowCheck_ = nullptr;
     HWND trayCheck_ = nullptr;
     HWND shortOpacityEdit_ = nullptr;
     HWND shortMessageEdit_ = nullptr;

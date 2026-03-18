@@ -56,6 +56,7 @@ struct ScheduledRest
 struct AppSettings
 {
     bool launchAtStartup = false;
+    bool openMainWindowOnLaunch = true;
     bool minimizeToTray = true;
     RestStyle shortRest;
     RestStyle longRest;

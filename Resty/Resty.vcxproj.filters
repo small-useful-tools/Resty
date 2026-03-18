@@ -66,7 +66,7 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="resources\logo\logo-256.ico">
+    <Image Include="resources\logo\logo-multi.ico">
       <Filter>资源文件</Filter>
     </Image>
   </ItemGroup>

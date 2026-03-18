@@ -476,6 +476,7 @@ AppSettings CreateDefaultSettings()
 {
     AppSettings settings;
     settings.launchAtStartup = false;
+    settings.openMainWindowOnLaunch = true;
     settings.minimizeToTray = true;
     settings.shortRest.opacity = 220;
     settings.shortRest.color = RGB(30, 64, 175);

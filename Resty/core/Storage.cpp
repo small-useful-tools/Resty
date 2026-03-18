@@ -95,6 +95,7 @@ void SaveSettings(const AppSettings& settings)
     EnsureStorageDirectories();
 
     WriteIniString(L"app", L"auto_start", settings.launchAtStartup ? L"1" : L"0");
+    WriteIniString(L"app", L"open_main_window_on_launch", settings.openMainWindowOnLaunch ? L"1" : L"0");
     WriteIniString(L"app", L"minimize_to_tray", settings.minimizeToTray ? L"1" : L"0");
 
     WriteIniString(L"short_rest", L"opacity", std::to_wstring(ClampOpacity(settings.shortRest.opacity)));
@@ -121,6 +122,7 @@ AppSettings LoadSettings()
     }
 
     settings.launchAtStartup = ReadIniInt(L"app", L"auto_start", settings.launchAtStartup ? 1 : 0) != 0;
+    settings.openMainWindowOnLaunch = ReadIniInt(L"app", L"open_main_window_on_launch", settings.openMainWindowOnLaunch ? 1 : 0) != 0;
     settings.minimizeToTray = ReadIniInt(L"app", L"minimize_to_tray", settings.minimizeToTray ? 1 : 0) != 0;
 
     settings.shortRest.opacity = ClampOpacity(ReadIniInt(L"short_rest", L"opacity", settings.shortRest.opacity));

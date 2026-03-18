@@ -150,7 +150,7 @@
     <ResourceCompile Include="Resty.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="resources\logo\logo-256.ico" />
+    <Image Include="resources\logo\logo-multi.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
