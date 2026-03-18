@@ -101,9 +101,9 @@ message=离开工位，走动几分钟，真正休息一下。
 优先使用“每行一条规则”的轻文本方案，便于单 exe 读写：
 
 ```text
-short|daily|10:30
-short|weekly|Mon,Tue,Wed,Thu,Fri|15:30
-long|date|2026-05-01|14:00
+short|daily|10:30|5
+short|weekly|Mon,Tue,Wed,Thu,Fri|15:30|5
+long|date|2026-05-01|14:00|15
 ```
 
 说明：
@@ -113,6 +113,7 @@ long|date|2026-05-01|14:00
 - `daily`：每日固定时间
 - `weekly`：每周循环
 - `date`：固定日期
+- 最后一段数字：本次休息时长（分钟）
 
 ---
 
@@ -128,6 +129,7 @@ long|date|2026-05-01|14:00
 ### 当前建议栈
 
 - UI：Win32 API + GDI
+- 图标：本地 `.ico` 资源文件，可随时替换占位图
 - 托盘：`Shell_NotifyIcon`
 - 配置：INI 文件
 - 规则存储：纯文本文件

@@ -37,6 +37,7 @@ struct ScheduleRule
     RuleMode mode = RuleMode::Daily;
     int hour = 9;
     int minute = 0;
+    int durationMinutes = 5;
     int weekdaysMask = 0;
     int year = 0;
     int month = 0;
@@ -48,6 +49,7 @@ struct ScheduledRest
     bool valid = false;
     RestKind kind = RestKind::Short;
     __time64_t when = 0;
+    int durationMinutes = 0;
     std::wstring description;
 };
 
@@ -65,6 +67,8 @@ std::wstring ToLower(std::wstring value);
 std::vector<std::wstring> Split(const std::wstring& value, wchar_t delimiter);
 
 int ClampOpacity(int value);
+int ClampDurationMinutes(int value);
+int GetDefaultDurationMinutes(RestKind kind);
 std::wstring FormatColor(COLORREF color);
 bool ParseColor(const std::wstring& text, COLORREF& color);
 std::wstring GetRestKindText(RestKind kind);

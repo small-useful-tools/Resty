@@ -144,6 +144,13 @@
     <ClInclude Include="core\Rule.h" />
     <ClInclude Include="core\Storage.h" />
     <ClInclude Include="platform\AutoStartService.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resty.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\logo\logo-256.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDI_RESTY_APP ICON "resources\\logo\\logo-256.ico"

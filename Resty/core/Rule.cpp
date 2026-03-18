@@ -11,6 +11,10 @@ namespace
 {
 constexpr int kMinOpacity = 40;
 constexpr int kMaxOpacity = 255;
+constexpr int kMinDurationMinutes = 1;
+constexpr int kMaxDurationMinutes = 240;
+constexpr int kDefaultShortDurationMinutes = 5;
+constexpr int kDefaultLongDurationMinutes = 15;
 
 bool IsLeapYear(int year)
 {
@@ -42,6 +46,16 @@ bool ParseTimeText(const std::wstring& value, int& hour, int& minute)
         return false;
     }
     return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+bool ParseDurationText(const std::wstring& value, int& minutes)
+{
+    minutes = 0;
+    if (swscanf_s(value.c_str(), L"%d", &minutes) != 1)
+    {
+        return false;
+    }
+    return minutes >= kMinDurationMinutes && minutes <= kMaxDurationMinutes;
 }
 
 bool ParseDateText(const std::wstring& value, int& year, int& month, int& day)
@@ -262,6 +276,16 @@ int ClampOpacity(int value)
     return std::max(kMinOpacity, std::min(kMaxOpacity, value));
 }
 
+int ClampDurationMinutes(int value)
+{
+    return std::max(kMinDurationMinutes, std::min(kMaxDurationMinutes, value));
+}
+
+int GetDefaultDurationMinutes(RestKind kind)
+{
+    return kind == RestKind::Short ? kDefaultShortDurationMinutes : kDefaultLongDurationMinutes;
+}
+
 std::wstring FormatColor(COLORREF color)
 {
     wchar_t buffer[16] = {};
@@ -300,6 +324,7 @@ std::wstring GetRestKindText(RestKind kind)
 
 bool ParseRuleLine(const std::wstring& line, ScheduleRule& rule, std::wstring& error)
 {
+    rule = ScheduleRule{};
     const auto parts = Split(line, L'|');
     if (parts.size() < 3)
     {
@@ -321,13 +346,19 @@ bool ParseRuleLine(const std::wstring& line, ScheduleRule& rule, std::wstring& e
         error = L"休息类型仅支持 short/long";
         return false;
     }
+    rule.durationMinutes = GetDefaultDurationMinutes(rule.kind);
 
     const std::wstring modeText = ToLower(parts[1]);
     if (modeText == L"daily" || modeText == L"每天")
     {
-        if (parts.size() != 3 || !ParseTimeText(parts[2], rule.hour, rule.minute))
+        if ((parts.size() != 3 && parts.size() != 4) || !ParseTimeText(parts[2], rule.hour, rule.minute))
         {
-            error = L"每天规则格式应为 short|daily|10:30";
+            error = L"每天规则格式应为 short|daily|10:30|5";
+            return false;
+        }
+        if (parts.size() == 4 && !ParseDurationText(parts[3], rule.durationMinutes))
+        {
+            error = L"休息时长必须是 1 到 240 之间的分钟数。";
             return false;
         }
         rule.mode = RuleMode::Daily;
@@ -336,9 +367,9 @@ bool ParseRuleLine(const std::wstring& line, ScheduleRule& rule, std::wstring& e
 
     if (modeText == L"weekly" || modeText == L"每周")
     {
-        if (parts.size() != 4 || !ParseTimeText(parts[3], rule.hour, rule.minute))
+        if ((parts.size() != 4 && parts.size() != 5) || !ParseTimeText(parts[3], rule.hour, rule.minute))
         {
-            error = L"每周规则格式应为 short|weekly|Mon,Tue,Fri|10:30";
+            error = L"每周规则格式应为 short|weekly|Mon,Tue,Fri|10:30|5";
             return false;
         }
 
@@ -358,6 +389,11 @@ bool ParseRuleLine(const std::wstring& line, ScheduleRule& rule, std::wstring& e
             error = L"每周规则至少需要一个星期";
             return false;
         }
+        if (parts.size() == 5 && !ParseDurationText(parts[4], rule.durationMinutes))
+        {
+            error = L"休息时长必须是 1 到 240 之间的分钟数。";
+            return false;
+        }
         rule.mode = RuleMode::Weekly;
         rule.weekdaysMask = mask;
         return true;
@@ -365,9 +401,14 @@ bool ParseRuleLine(const std::wstring& line, ScheduleRule& rule, std::wstring& e
 
     if (modeText == L"date" || modeText == L"固定日期")
     {
-        if (parts.size() != 4 || !ParseDateText(parts[2], rule.year, rule.month, rule.day) || !ParseTimeText(parts[3], rule.hour, rule.minute))
+        if ((parts.size() != 4 && parts.size() != 5) || !ParseDateText(parts[2], rule.year, rule.month, rule.day) || !ParseTimeText(parts[3], rule.hour, rule.minute))
         {
-            error = L"固定日期规则格式应为 long|date|2026-05-01|15:00";
+            error = L"固定日期规则格式应为 long|date|2026-05-01|15:00|15";
+            return false;
+        }
+        if (parts.size() == 5 && !ParseDurationText(parts[4], rule.durationMinutes))
+        {
+            error = L"休息时长必须是 1 到 240 之间的分钟数。";
             return false;
         }
         rule.mode = RuleMode::Date;
@@ -383,7 +424,7 @@ std::wstring RuleToLine(const ScheduleRule& rule)
     std::wstring line = rule.kind == RestKind::Short ? L"short|" : L"long|";
     if (rule.mode == RuleMode::Daily)
     {
-        return line + L"daily|" + Pad2(rule.hour) + L":" + Pad2(rule.minute);
+        return line + L"daily|" + Pad2(rule.hour) + L":" + Pad2(rule.minute) + L"|" + std::to_wstring(ClampDurationMinutes(rule.durationMinutes));
     }
 
     if (rule.mode == RuleMode::Weekly)
@@ -404,10 +445,11 @@ std::wstring RuleToLine(const ScheduleRule& rule)
             }
         }
         return line + L"|" + Pad2(rule.hour) + L":" + Pad2(rule.minute);
+        return line + L"|" + Pad2(rule.hour) + L":" + Pad2(rule.minute) + L"|" + std::to_wstring(ClampDurationMinutes(rule.durationMinutes));
     }
 
     wchar_t buffer[64] = {};
-    swprintf_s(buffer, L"date|%04d-%02d-%02d|%02d:%02d", rule.year, rule.month, rule.day, rule.hour, rule.minute);
+    swprintf_s(buffer, L"date|%04d-%02d-%02d|%02d:%02d|%d", rule.year, rule.month, rule.day, rule.hour, rule.minute, ClampDurationMinutes(rule.durationMinutes));
     return line + buffer;
 }
 
@@ -416,17 +458,17 @@ std::wstring FormatRuleSummary(const ScheduleRule& rule)
     wchar_t buffer[128] = {};
     if (rule.mode == RuleMode::Daily)
     {
-        swprintf_s(buffer, L"每天 %02d:%02d · %s", rule.hour, rule.minute, GetRestKindText(rule.kind).c_str());
+        swprintf_s(buffer, L"每天 %02d:%02d · %s · %d 分钟", rule.hour, rule.minute, GetRestKindText(rule.kind).c_str(), ClampDurationMinutes(rule.durationMinutes));
         return buffer;
     }
 
     if (rule.mode == RuleMode::Weekly)
     {
-        swprintf_s(buffer, L"每周 %s %02d:%02d · %s", WeekdayMaskText(rule.weekdaysMask).c_str(), rule.hour, rule.minute, GetRestKindText(rule.kind).c_str());
+        swprintf_s(buffer, L"每周 %s %02d:%02d · %s · %d 分钟", WeekdayMaskText(rule.weekdaysMask).c_str(), rule.hour, rule.minute, GetRestKindText(rule.kind).c_str(), ClampDurationMinutes(rule.durationMinutes));
         return buffer;
     }
 
-    swprintf_s(buffer, L"固定日期 %04d-%02d-%02d %02d:%02d · %s", rule.year, rule.month, rule.day, rule.hour, rule.minute, GetRestKindText(rule.kind).c_str());
+    swprintf_s(buffer, L"固定日期 %04d-%02d-%02d %02d:%02d · %s · %d 分钟", rule.year, rule.month, rule.day, rule.hour, rule.minute, GetRestKindText(rule.kind).c_str(), ClampDurationMinutes(rule.durationMinutes));
     return buffer;
 }
 
@@ -443,8 +485,9 @@ AppSettings CreateDefaultSettings()
     settings.longRest.message = L"离开工位，走动几分钟，真正休息一下。";
 
     settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 10, 30, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
-    settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 15, 30, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
-    settings.rules.push_back({ RestKind::Long, RuleMode::Weekly, 12, 0, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
+    settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 10, 30, 5, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
+    settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 15, 30, 5, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
+    settings.rules.push_back({ RestKind::Long, RuleMode::Weekly, 12, 0, 15, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
     return settings;
 }
 
@@ -484,6 +527,7 @@ ScheduledRest FindNextRest(const AppSettings& settings, const SYSTEMTIME& now)
             next.valid = true;
             next.when = when;
             next.kind = rule.kind;
+            next.durationMinutes = ClampDurationMinutes(rule.durationMinutes);
         }
     }
 
@@ -498,7 +542,7 @@ ScheduledRest FindNextRest(const AppSettings& settings, const SYSTEMTIME& now)
             WeekdayText(nextTime.wDayOfWeek).c_str(),
             nextTime.wHour,
             nextTime.wMinute,
-            GetRestKindText(next.kind).c_str());
+            (GetRestKindText(next.kind) + L" · " + std::to_wstring(next.durationMinutes) + L" 分钟").c_str());
         next.description = buffer;
     }
 

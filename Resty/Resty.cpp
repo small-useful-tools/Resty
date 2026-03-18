@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "resource.h"
 #include "core/PathService.h"
 #include "core/Rule.h"
 #include "core/Storage.h"
@@ -41,7 +42,22 @@ void SetWindowTextSafe(HWND hwnd, const std::wstring& value)
 {
     if (hwnd != nullptr)
     {
-        SetWindowTextW(hwnd, value.c_str());
+        const int length = GetWindowTextLengthW(hwnd);
+        std::wstring current(static_cast<size_t>(std::max(length, 0)) + 1, L'\0');
+        if (length > 0)
+        {
+            GetWindowTextW(hwnd, &current[0], length + 1);
+            current.resize(length);
+        }
+        else
+        {
+            current.clear();
+        }
+
+        if (current != value)
+        {
+            SetWindowTextW(hwnd, value.c_str());
+        }
     }
 }
 
@@ -103,6 +119,16 @@ void ApplyEditTheme(HWND edit, const wchar_t* cueBanner)
     SetWindowTheme(edit, L"Explorer", nullptr);
     SendMessageW(edit, EM_SETMARGINS, EC_LEFTMARGIN | EC_RIGHTMARGIN, MAKELPARAM(10, 10));
     SendMessageW(edit, EM_SETCUEBANNER, TRUE, reinterpret_cast<LPARAM>(cueBanner));
+}
+
+HICON LoadAppIcon(HINSTANCE instance)
+{
+    HICON icon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_RESTY_APP));
+    if (icon == nullptr)
+    {
+        icon = LoadIconW(nullptr, IDI_APPLICATION);
+    }
+    return icon;
 }
 
 __time64_t ToTimeT(const SYSTEMTIME& st)
@@ -225,6 +251,22 @@ private:
         IdSettingsLongMessage,
         IdSettingsLongColor,
         IdSettingsRules,
+        IdRuleList,
+        IdRuleKind,
+        IdRuleMode,
+        IdRuleTime,
+        IdRuleDuration,
+        IdRuleDate,
+        IdRuleWeekdaySun,
+        IdRuleWeekdayMon,
+        IdRuleWeekdayTue,
+        IdRuleWeekdayWed,
+        IdRuleWeekdayThu,
+        IdRuleWeekdayFri,
+        IdRuleWeekdaySat,
+        IdRuleAdd,
+        IdRuleUpdate,
+        IdRuleDelete,
         IdSettingsSave,
         IdSettingsClose,
         IdTrayShowMain,
@@ -241,7 +283,8 @@ private:
         mainClass.lpszClassName = kMainClassName;
         mainClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         mainClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-        mainClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        mainClass.hIcon = LoadAppIcon(instance_);
+        mainClass.hIconSm = LoadAppIcon(instance_);
         if (RegisterClassExW(&mainClass) == 0)
         {
             return false;
@@ -254,7 +297,8 @@ private:
         settingsClass.lpszClassName = kSettingsClassName;
         settingsClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
         settingsClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-        settingsClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        settingsClass.hIcon = LoadAppIcon(instance_);
+        settingsClass.hIconSm = LoadAppIcon(instance_);
         if (RegisterClassExW(&settingsClass) == 0)
         {
             return false;
@@ -317,17 +361,17 @@ private:
     {
         mainTitleLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"专注工作，按时休息", WS_CHILD | WS_VISIBLE, 32, 28, 320, 34, hwnd, nullptr, instance_, nullptr);
         mainSubtitleLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"Resty 会根据规则自动提醒你离开屏幕、活动肩颈与放松眼睛。", WS_CHILD | WS_VISIBLE, 32, 66, 520, 22, hwnd, nullptr, instance_, nullptr);
-        countdownLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"距离下次休息", WS_CHILD | WS_VISIBLE, 56, 122, 180, 24, hwnd, nullptr, instance_, nullptr);
-        countdownValue_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"00:00:00", WS_CHILD | WS_VISIBLE, 56, 150, 320, 78, hwnd, reinterpret_cast<HMENU>(IdCountdownValue), instance_, nullptr);
-        countdownHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"倒计时会实时刷新，命中规则后自动弹出提醒遮罩。", WS_CHILD | WS_VISIBLE, 56, 236, 300, 20, hwnd, nullptr, instance_, nullptr);
+        countdownLabel_ = CreateWindowExW(0, L"STATIC", L"距离下次休息", WS_CHILD | WS_VISIBLE, 56, 122, 180, 24, hwnd, nullptr, instance_, nullptr);
+        countdownValue_ = CreateWindowExW(0, L"STATIC", L"00:00:00", WS_CHILD | WS_VISIBLE, 56, 150, 320, 78, hwnd, reinterpret_cast<HMENU>(IdCountdownValue), instance_, nullptr);
+        countdownHintLabel_ = CreateWindowExW(0, L"STATIC", L"倒计时会实时刷新，命中规则后自动弹出提醒遮罩。", WS_CHILD | WS_VISIBLE, 56, 236, 300, 20, hwnd, nullptr, instance_, nullptr);
 
-        nextLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"下一条提醒", WS_CHILD | WS_VISIBLE, 444, 122, 180, 24, hwnd, nullptr, instance_, nullptr);
-        nextValue_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"未找到规则", WS_CHILD | WS_VISIBLE, 444, 150, 340, 72, hwnd, reinterpret_cast<HMENU>(IdNextValue), instance_, nullptr);
-        nextHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"支持 daily / weekly / date，多段规则会自动取最近的一次。", WS_CHILD | WS_VISIBLE, 444, 236, 340, 20, hwnd, nullptr, instance_, nullptr);
+        nextLabel_ = CreateWindowExW(0, L"STATIC", L"下一条提醒", WS_CHILD | WS_VISIBLE, 444, 122, 180, 24, hwnd, nullptr, instance_, nullptr);
+        nextValue_ = CreateWindowExW(0, L"STATIC", L"未找到规则", WS_CHILD | WS_VISIBLE, 444, 150, 340, 72, hwnd, reinterpret_cast<HMENU>(IdNextValue), instance_, nullptr);
+        nextHintLabel_ = CreateWindowExW(0, L"STATIC", L"支持 daily / weekly / date，多段规则会自动取最近的一次。", WS_CHILD | WS_VISIBLE, 444, 236, 340, 20, hwnd, nullptr, instance_, nullptr);
 
-        storageLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"本地存储", WS_CHILD | WS_VISIBLE, 56, 344, 180, 24, hwnd, nullptr, instance_, nullptr);
-        summaryValue_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 56, 376, 472, 68, hwnd, reinterpret_cast<HMENU>(IdSummaryValue), instance_, nullptr);
-        actionLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"快速操作", WS_CHILD | WS_VISIBLE, 580, 344, 180, 24, hwnd, nullptr, instance_, nullptr);
+        storageLabel_ = CreateWindowExW(0, L"STATIC", L"本地存储", WS_CHILD | WS_VISIBLE, 56, 344, 180, 24, hwnd, nullptr, instance_, nullptr);
+        summaryValue_ = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 56, 376, 472, 68, hwnd, reinterpret_cast<HMENU>(IdSummaryValue), instance_, nullptr);
+        actionLabel_ = CreateWindowExW(0, L"STATIC", L"快速操作", WS_CHILD | WS_VISIBLE, 580, 344, 180, 24, hwnd, nullptr, instance_, nullptr);
 
         openSettingsButton_ = CreateWindowExW(0, L"BUTTON", L"打开设置", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 580, 376, 108, 40, hwnd, reinterpret_cast<HMENU>(IdOpenSettings), instance_, nullptr);
         previewShortButton_ = CreateWindowExW(0, L"BUTTON", L"预览小休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 700, 376, 108, 40, hwnd, reinterpret_cast<HMENU>(IdPreviewShort), instance_, nullptr);
@@ -390,7 +434,7 @@ private:
         trayIcon_.uID = 1;
         trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         trayIcon_.uCallbackMessage = kTrayMessage;
-        trayIcon_.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        trayIcon_.hIcon = LoadAppIcon(instance_);
         wcscpy_s(trayIcon_.szTip, L"Resty - 工作休息提醒");
         Shell_NotifyIconW(NIM_ADD, &trayIcon_);
     }
@@ -448,7 +492,7 @@ private:
             CW_USEDEFAULT,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            mainWindow_,
+            nullptr,
             nullptr,
             instance_,
             this);
@@ -480,22 +524,50 @@ private:
         longMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 108, 398, 684, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongMessage), instance_, nullptr);
 
         CreateWindowExW(0, L"BUTTON", L"休息规则", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 466, 792, 256, hwnd, nullptr, instance_, nullptr);
-        const wchar_t* helpText =
-            L"规则存储在 %USERPROFILE%\\.resty\\data\\rest.txt，每行一条：\r\n"
-            L"1) short|daily|10:30\r\n"
-            L"2) short|weekly|Mon,Tue,Wed,Thu,Fri|15:30\r\n"
-            L"3) long|date|2026-05-01|14:00\r\n"
-            L"注：weekly 支持 Mon-Sun、1-7、周一-周日。";
-        settingsHelpLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", helpText, WS_CHILD | WS_VISIBLE, 48, 500, 736, 70, hwnd, nullptr, instance_, nullptr);
-        rulesEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL,
-            48, 576, 736, 104, hwnd, reinterpret_cast<HMENU>(IdSettingsRules), instance_, nullptr);
-        settingsPathHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"配置文件与规则文件会自动保存在当前用户目录，无需管理员权限。", WS_CHILD | WS_VISIBLE, 48, 686, 540, 20, hwnd, nullptr, instance_, nullptr);
+        settingsHelpLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"使用下方时间段编辑器维护规则，保存时仍会写回 .resty/data/rest.txt。", WS_CHILD | WS_VISIBLE, 48, 500, 700, 20, hwnd, nullptr, instance_, nullptr);
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"已配置时间段", WS_CHILD | WS_VISIBLE, 48, 532, 130, 20, hwnd, nullptr, instance_, nullptr);
+        ruleListBox_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | LBS_NOTIFY,
+            48, 558, 314, 120, hwnd, reinterpret_cast<HMENU>(IdRuleList), instance_, nullptr);
+
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"休息类型", WS_CHILD | WS_VISIBLE, 390, 532, 80, 20, hwnd, nullptr, instance_, nullptr);
+        ruleKindCombo_ = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST,
+            390, 556, 112, 240, hwnd, reinterpret_cast<HMENU>(IdRuleKind), instance_, nullptr);
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"规则类型", WS_CHILD | WS_VISIBLE, 522, 532, 80, 20, hwnd, nullptr, instance_, nullptr);
+        ruleModeCombo_ = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST,
+            522, 556, 128, 240, hwnd, reinterpret_cast<HMENU>(IdRuleMode), instance_, nullptr);
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"时间(HH:MM)", WS_CHILD | WS_VISIBLE, 658, 532, 84, 20, hwnd, nullptr, instance_, nullptr);
+        ruleTimeEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            658, 556, 84, 32, hwnd, reinterpret_cast<HMENU>(IdRuleTime), instance_, nullptr);
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"时长(分钟)", WS_CHILD | WS_VISIBLE, 748, 532, 72, 20, hwnd, nullptr, instance_, nullptr);
+        ruleDurationEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            748, 556, 44, 32, hwnd, reinterpret_cast<HMENU>(IdRuleDuration), instance_, nullptr);
+
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"固定日期", WS_CHILD | WS_VISIBLE, 390, 598, 80, 20, hwnd, nullptr, instance_, nullptr);
+        ruleDateEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+            390, 622, 170, 32, hwnd, reinterpret_cast<HMENU>(IdRuleDate), instance_, nullptr);
+        CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"星期重复", WS_CHILD | WS_VISIBLE, 584, 598, 80, 20, hwnd, nullptr, instance_, nullptr);
+
+        ruleWeekdayChecks_[0] = CreateWindowExW(0, L"BUTTON", L"日", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 584, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdaySun), instance_, nullptr);
+        ruleWeekdayChecks_[1] = CreateWindowExW(0, L"BUTTON", L"一", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 620, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayMon), instance_, nullptr);
+        ruleWeekdayChecks_[2] = CreateWindowExW(0, L"BUTTON", L"二", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 656, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayTue), instance_, nullptr);
+        ruleWeekdayChecks_[3] = CreateWindowExW(0, L"BUTTON", L"三", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 692, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayWed), instance_, nullptr);
+        ruleWeekdayChecks_[4] = CreateWindowExW(0, L"BUTTON", L"四", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 728, 624, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayThu), instance_, nullptr);
+        ruleWeekdayChecks_[5] = CreateWindowExW(0, L"BUTTON", L"五", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 584, 650, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdayFri), instance_, nullptr);
+        ruleWeekdayChecks_[6] = CreateWindowExW(0, L"BUTTON", L"六", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 620, 650, 34, 20, hwnd, reinterpret_cast<HMENU>(IdRuleWeekdaySat), instance_, nullptr);
+
+        ruleAddButton_ = CreateWindowExW(0, L"BUTTON", L"新增时间段", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 390, 682, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleAdd), instance_, nullptr);
+        ruleUpdateButton_ = CreateWindowExW(0, L"BUTTON", L"更新选中", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 520, 682, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleUpdate), instance_, nullptr);
+        ruleDeleteButton_ = CreateWindowExW(0, L"BUTTON", L"删除选中", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 650, 682, 120, 36, hwnd, reinterpret_cast<HMENU>(IdRuleDelete), instance_, nullptr);
+
+        settingsPathHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"支持每天、每周、固定日期；最终仍会按原文本格式保存。", WS_CHILD | WS_VISIBLE, 48, 686, 320, 20, hwnd, nullptr, instance_, nullptr);
 
         saveButton_ = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 616, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsSave), instance_, nullptr);
         closeButton_ = CreateWindowExW(0, L"BUTTON", L"关闭", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 720, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsClose), instance_, nullptr);
 
         for (HWND child : { settingsTitleLabel_, settingsSubtitleLabel_, startupCheck_, trayCheck_, shortOpacityEdit_, shortColorEdit_, shortMessageEdit_,
-            longOpacityEdit_, longColorEdit_, longMessageEdit_, settingsHelpLabel_, rulesEdit_, settingsPathHintLabel_, saveButton_, closeButton_ })
+            longOpacityEdit_, longColorEdit_, longMessageEdit_, settingsHelpLabel_, ruleListBox_, ruleKindCombo_, ruleModeCombo_, ruleTimeEdit_, ruleDurationEdit_, ruleDateEdit_,
+            ruleWeekdayChecks_[0], ruleWeekdayChecks_[1], ruleWeekdayChecks_[2], ruleWeekdayChecks_[3], ruleWeekdayChecks_[4], ruleWeekdayChecks_[5], ruleWeekdayChecks_[6],
+            ruleAddButton_, ruleUpdateButton_, ruleDeleteButton_, settingsPathHintLabel_, saveButton_, closeButton_ })
         {
             SetControlFont(child, baseFont_);
         }
@@ -511,7 +583,18 @@ private:
         ApplyEditTheme(longOpacityEdit_, L"235");
         ApplyEditTheme(longColorEdit_, L"#7F1D1D");
         ApplyEditTheme(longMessageEdit_, L"离开工位，走动几分钟，真正休息一下。");
-        ApplyEditTheme(rulesEdit_, L"short|weekly|Mon,Tue,Wed,Thu,Fri|15:30");
+        ApplyEditTheme(ruleTimeEdit_, L"15:30");
+        ApplyEditTheme(ruleDurationEdit_, L"5");
+        ApplyEditTheme(ruleDateEdit_, L"2026-05-01");
+        SetWindowTheme(ruleListBox_, L"Explorer", nullptr);
+        SetWindowTheme(ruleKindCombo_, L"Explorer", nullptr);
+        SetWindowTheme(ruleModeCombo_, L"Explorer", nullptr);
+
+        SendMessageW(ruleKindCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"小休息"));
+        SendMessageW(ruleKindCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"大休息"));
+        SendMessageW(ruleModeCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"每天"));
+        SendMessageW(ruleModeCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"每周"));
+        SendMessageW(ruleModeCombo_, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"固定日期"));
     }
 
     void DrawSettingsWindow(HWND hwnd) const
@@ -525,6 +608,260 @@ private:
         const RECT accentPill = { 24, 14, 132, 20 };
         DrawRoundedCard(dc, accentPill, kAccentColor, kAccentColor, 8);
         EndPaint(hwnd, &paint);
+    }
+
+    int GetWeekdayMaskFromEditor() const
+    {
+        int mask = 0;
+        for (int day = 0; day < 7; ++day)
+        {
+            if (SendMessageW(ruleWeekdayChecks_[day], BM_GETCHECK, 0, 0) == BST_CHECKED)
+            {
+                mask |= (1 << day);
+            }
+        }
+        return mask;
+    }
+
+    void SetWeekdayMaskToEditor(int mask)
+    {
+        for (int day = 0; day < 7; ++day)
+        {
+            SendMessageW(ruleWeekdayChecks_[day], BM_SETCHECK, (mask & (1 << day)) != 0 ? BST_CHECKED : BST_UNCHECKED, 0);
+        }
+    }
+
+    void UpdateRuleEditorEnabledState()
+    {
+        const int modeIndex = static_cast<int>(SendMessageW(ruleModeCombo_, CB_GETCURSEL, 0, 0));
+        const bool isWeekly = modeIndex == 1;
+        const bool isDate = modeIndex == 2;
+        EnableWindow(ruleDateEdit_, isDate ? TRUE : FALSE);
+        for (HWND checkbox : ruleWeekdayChecks_)
+        {
+            EnableWindow(checkbox, isWeekly ? TRUE : FALSE);
+        }
+    }
+
+    void ResetRuleEditor()
+    {
+        SendMessageW(ruleKindCombo_, CB_SETCURSEL, 0, 0);
+        SendMessageW(ruleModeCombo_, CB_SETCURSEL, 1, 0);
+        SetWindowTextW(ruleTimeEdit_, L"10:30");
+        SetWindowTextW(ruleDurationEdit_, std::to_wstring(resty::GetDefaultDurationMinutes(resty::RestKind::Short)).c_str());
+        SetWindowTextW(ruleDateEdit_, L"");
+        SetWeekdayMaskToEditor((1 << 1) | (1 << 2) | (1 << 3) | (1 << 4) | (1 << 5));
+        UpdateRuleEditorEnabledState();
+    }
+
+    int GetRuleSortPriority(resty::RuleMode mode) const
+    {
+        switch (mode)
+        {
+        case resty::RuleMode::Date:
+            return 0;
+        case resty::RuleMode::Daily:
+            return 1;
+        case resty::RuleMode::Weekly:
+            return 2;
+        default:
+            return 3;
+        }
+    }
+
+    bool AreRulesEquivalent(const resty::ScheduleRule& left, const resty::ScheduleRule& right) const
+    {
+        return left.kind == right.kind
+            && left.mode == right.mode
+            && left.hour == right.hour
+            && left.minute == right.minute
+            && left.durationMinutes == right.durationMinutes
+            && left.weekdaysMask == right.weekdaysMask
+            && left.year == right.year
+            && left.month == right.month
+            && left.day == right.day;
+    }
+
+    void SortRuleDrafts()
+    {
+        std::stable_sort(ruleDrafts_.begin(), ruleDrafts_.end(), [this](const resty::ScheduleRule& left, const resty::ScheduleRule& right)
+        {
+            const int leftPriority = GetRuleSortPriority(left.mode);
+            const int rightPriority = GetRuleSortPriority(right.mode);
+            if (leftPriority != rightPriority)
+            {
+                return leftPriority < rightPriority;
+            }
+
+            if (left.hour != right.hour)
+            {
+                return left.hour < right.hour;
+            }
+            if (left.minute != right.minute)
+            {
+                return left.minute < right.minute;
+            }
+
+            if (left.mode == resty::RuleMode::Date)
+            {
+                if (left.year != right.year)
+                {
+                    return left.year < right.year;
+                }
+                if (left.month != right.month)
+                {
+                    return left.month < right.month;
+                }
+                if (left.day != right.day)
+                {
+                    return left.day < right.day;
+                }
+            }
+
+            if (left.mode == resty::RuleMode::Weekly && left.weekdaysMask != right.weekdaysMask)
+            {
+                return left.weekdaysMask < right.weekdaysMask;
+            }
+
+            if (left.kind != right.kind)
+            {
+                return static_cast<int>(left.kind) < static_cast<int>(right.kind);
+            }
+
+            return left.durationMinutes < right.durationMinutes;
+        });
+    }
+
+    int FindRuleIndex(const resty::ScheduleRule& target) const
+    {
+        for (int index = 0; index < static_cast<int>(ruleDrafts_.size()); ++index)
+        {
+            if (AreRulesEquivalent(ruleDrafts_[index], target))
+            {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    void RefreshRuleList()
+    {
+        SendMessageW(ruleListBox_, LB_RESETCONTENT, 0, 0);
+        for (const auto& rule : ruleDrafts_)
+        {
+            SendMessageW(ruleListBox_, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(resty::FormatRuleSummary(rule).c_str()));
+        }
+    }
+
+    void LoadRuleIntoEditor(int index)
+    {
+        if (index < 0 || index >= static_cast<int>(ruleDrafts_.size()))
+        {
+            ResetRuleEditor();
+            return;
+        }
+
+        const auto& rule = ruleDrafts_[index];
+        SendMessageW(ruleKindCombo_, CB_SETCURSEL, rule.kind == resty::RestKind::Short ? 0 : 1, 0);
+        SendMessageW(ruleModeCombo_, CB_SETCURSEL, rule.mode == resty::RuleMode::Daily ? 0 : (rule.mode == resty::RuleMode::Weekly ? 1 : 2), 0);
+
+        wchar_t timeBuffer[16] = {};
+        swprintf_s(timeBuffer, L"%02d:%02d", rule.hour, rule.minute);
+        SetWindowTextW(ruleTimeEdit_, timeBuffer);
+        SetWindowTextW(ruleDurationEdit_, std::to_wstring(resty::ClampDurationMinutes(rule.durationMinutes)).c_str());
+
+        wchar_t dateBuffer[24] = {};
+        if (rule.mode == resty::RuleMode::Date)
+        {
+            swprintf_s(dateBuffer, L"%04d-%02d-%02d", rule.year, rule.month, rule.day);
+        }
+        SetWindowTextW(ruleDateEdit_, dateBuffer);
+        SetWeekdayMaskToEditor(rule.weekdaysMask);
+        UpdateRuleEditorEnabledState();
+    }
+
+    bool BuildRuleFromEditor(resty::ScheduleRule& rule, std::wstring& error) const
+    {
+        const int kindIndex = static_cast<int>(SendMessageW(ruleKindCombo_, CB_GETCURSEL, 0, 0));
+        const int modeIndex = static_cast<int>(SendMessageW(ruleModeCombo_, CB_GETCURSEL, 0, 0));
+        if (kindIndex < 0 || modeIndex < 0)
+        {
+            error = L"请选择休息类型与规则类型。";
+            return false;
+        }
+
+        std::wstring line = kindIndex == 0 ? L"short|" : L"long|";
+        const std::wstring timeText = resty::Trim(GetWindowTextString(ruleTimeEdit_));
+        const std::wstring durationText = resty::Trim(GetWindowTextString(ruleDurationEdit_));
+        if (timeText.empty())
+        {
+            error = L"时间不能为空，格式例如 10:30。";
+            return false;
+        }
+        if (durationText.empty())
+        {
+            error = L"休息时长不能为空，单位为分钟。";
+            return false;
+        }
+
+        int durationMinutes = 0;
+        try
+        {
+            durationMinutes = std::stoi(durationText);
+        }
+        catch (...)
+        {
+            error = L"休息时长必须是 1 到 240 之间的整数分钟。";
+            return false;
+        }
+        if (durationMinutes < 1 || durationMinutes > 240)
+        {
+            error = L"休息时长必须是 1 到 240 之间的整数分钟。";
+            return false;
+        }
+
+        if (modeIndex == 0)
+        {
+            line += L"daily|" + timeText + L"|" + std::to_wstring(durationMinutes);
+        }
+        else if (modeIndex == 1)
+        {
+            const wchar_t* labels[] = { L"Sun", L"Mon", L"Tue", L"Wed", L"Thu", L"Fri", L"Sat" };
+            const int mask = GetWeekdayMaskFromEditor();
+            if (mask == 0)
+            {
+                error = L"每周规则至少选择一个星期。";
+                return false;
+            }
+
+            line += L"weekly|";
+            bool first = true;
+            for (int day = 0; day < 7; ++day)
+            {
+                if ((mask & (1 << day)) != 0)
+                {
+                    if (!first)
+                    {
+                        line += L",";
+                    }
+                    line += labels[day];
+                    first = false;
+                }
+            }
+            line += L"|" + timeText + L"|" + std::to_wstring(durationMinutes);
+        }
+        else
+        {
+            const std::wstring dateText = resty::Trim(GetWindowTextString(ruleDateEdit_));
+            if (dateText.empty())
+            {
+                error = L"固定日期规则需要填写日期，格式例如 2026-05-01。";
+                return false;
+            }
+            line += L"date|" + dateText + L"|" + timeText + L"|" + std::to_wstring(durationMinutes);
+        }
+
+        return resty::ParseRuleLine(line, rule, error);
     }
 
     void PopulateSettingsControls()
@@ -543,16 +880,18 @@ private:
         SetWindowTextW(longColorEdit_, resty::FormatColor(settings_.longRest.color).c_str());
         SetWindowTextW(longMessageEdit_, settings_.longRest.message.c_str());
 
-        std::wstring rulesText;
-        for (size_t index = 0; index < settings_.rules.size(); ++index)
+        ruleDrafts_ = settings_.rules;
+        SortRuleDrafts();
+        RefreshRuleList();
+        if (!ruleDrafts_.empty())
         {
-            if (index > 0)
-            {
-                rulesText += L"\r\n";
-            }
-            rulesText += resty::RuleToLine(settings_.rules[index]);
+            SendMessageW(ruleListBox_, LB_SETCURSEL, 0, 0);
+            LoadRuleIntoEditor(0);
         }
-        SetWindowTextW(rulesEdit_, rulesText.c_str());
+        else
+        {
+            ResetRuleEditor();
+        }
     }
 
     bool SaveSettingsFromUi()
@@ -586,41 +925,13 @@ private:
             return false;
         }
 
-        std::vector<resty::ScheduleRule> rules;
-        std::wstringstream stream(GetWindowTextString(rulesEdit_));
-        std::wstring line;
-        int lineNumber = 0;
-        while (std::getline(stream, line))
-        {
-            ++lineNumber;
-            line = resty::Trim(line);
-            if (!line.empty() && line.back() == L'\r')
-            {
-                line.pop_back();
-            }
-            if (line.empty() || line.front() == L'#')
-            {
-                continue;
-            }
-
-            resty::ScheduleRule rule;
-            std::wstring error;
-            if (!resty::ParseRuleLine(line, rule, error))
-            {
-                const std::wstring message = L"第 " + std::to_wstring(lineNumber) + L" 行规则无效：\n" + error;
-                MessageBoxW(settingsWindow_, message.c_str(), L"保存失败", MB_ICONWARNING);
-                return false;
-            }
-            rules.push_back(rule);
-        }
-
-        if (rules.empty())
+        if (ruleDrafts_.empty())
         {
             MessageBoxW(settingsWindow_, L"至少保留一条休息规则。", L"保存失败", MB_ICONWARNING);
             return false;
         }
 
-        updated.rules = std::move(rules);
+        updated.rules = ruleDrafts_;
         settings_ = std::move(updated);
         resty::SaveSettings(settings_);
         resty::SetAutoStart(settings_.launchAtStartup);
@@ -658,10 +969,6 @@ private:
 
         const std::wstring summary = L"已加载 " + std::to_wstring(settings_.rules.size()) + L" 条规则\r\n配置：" + resty::GetConfigPath() + L"\r\n规则：" + resty::GetRestDataPath();
         SetWindowTextSafe(summaryValue_, summary);
-        if (mainWindow_ != nullptr)
-        {
-            InvalidateRect(mainWindow_, nullptr, FALSE);
-        }
         CheckDueReminders(now);
     }
 
@@ -692,14 +999,16 @@ private:
         }
 
         lastDueKey_ = dueKey;
-        ShowOverlay(dueRule->kind);
+        ShowOverlay(dueRule->kind, resty::ClampDurationMinutes(dueRule->durationMinutes) * 60, false, resty::ClampDurationMinutes(dueRule->durationMinutes));
     }
 
-    void ShowOverlay(resty::RestKind kind)
+    void ShowOverlay(resty::RestKind kind, int durationSeconds, bool previewMode, int plannedDurationMinutes)
     {
         overlayKind_ = kind;
         overlayStyle_ = kind == resty::RestKind::Short ? settings_.shortRest : settings_.longRest;
-        overlayDurationSeconds_ = kind == resty::RestKind::Short ? kShortOverlaySeconds : kLongOverlaySeconds;
+        overlayDurationSeconds_ = std::max(1, durationSeconds);
+        overlayPlannedDurationMinutes_ = std::max(1, plannedDurationMinutes);
+        overlayPreviewMode_ = previewMode;
 
         SYSTEMTIME now = {};
         GetLocalTime(&now);
@@ -774,8 +1083,8 @@ private:
         GetLocalTime(&now);
         const __time64_t remaining = std::max(static_cast<__time64_t>(0), overlayDeadline_ - ToTimeT(now));
         const std::wstring title = overlayKind_ == resty::RestKind::Short ? L"小休息时间" : L"大休息时间";
-        const std::wstring countdownText = L"剩余 " + resty::FormatCountdown(remaining);
-        const std::wstring footer = overlayKind_ == resty::RestKind::Short ? L"建议站起来活动 1~2 分钟 · 点击任意位置关闭" : L"请离开屏幕，好好休息一下 · 点击任意位置关闭";
+        const std::wstring countdownText = (overlayPreviewMode_ ? L"预览剩余 " : L"本次休息剩余 ") + resty::FormatCountdown(remaining);
+        const std::wstring footer = (overlayPreviewMode_ ? L"预览模式" : (L"建议休息 " + std::to_wstring(overlayPlannedDurationMinutes_) + L" 分钟")) + L" · 点击任意位置关闭";
 
         RECT panel = client;
         if (overlayKind_ == resty::RestKind::Long)
@@ -930,29 +1239,56 @@ private:
         {
             HDC dc = reinterpret_cast<HDC>(wParam);
             HWND control = reinterpret_cast<HWND>(lParam);
-            SetBkMode(dc, TRANSPARENT);
+            SetBkMode(dc, OPAQUE);
 
-            if (control == mainTitleLabel_ || control == countdownLabel_ || control == nextLabel_ || control == storageLabel_ || control == actionLabel_)
+            if (control == mainTitleLabel_)
             {
                 SetTextColor(dc, kPrimaryText);
+                SetBkColor(dc, kWindowBackground);
+                return reinterpret_cast<INT_PTR>(windowBrush_);
+            }
+            else if (control == mainSubtitleLabel_)
+            {
+                SetTextColor(dc, kSecondaryText);
+                SetBkColor(dc, kWindowBackground);
+                return reinterpret_cast<INT_PTR>(windowBrush_);
+            }
+            else if (control == countdownLabel_ || control == nextLabel_ || control == storageLabel_ || control == actionLabel_)
+            {
+                SetTextColor(dc, kPrimaryText);
+                SetBkColor(dc, kCardBackground);
+                return reinterpret_cast<INT_PTR>(cardBrush_);
             }
             else if (control == countdownValue_)
             {
                 SetTextColor(dc, kAccentColor);
+                SetBkColor(dc, kCardBackground);
+                return reinterpret_cast<INT_PTR>(cardBrush_);
             }
             else if (control == nextValue_)
             {
                 SetTextColor(dc, kPrimaryText);
+                SetBkColor(dc, kCardBackground);
+                return reinterpret_cast<INT_PTR>(cardBrush_);
             }
             else
             {
                 SetTextColor(dc, kSecondaryText);
+                SetBkColor(dc, kCardBackground);
+                return reinterpret_cast<INT_PTR>(cardBrush_);
             }
-
-            return reinterpret_cast<INT_PTR>(GetStockObject(NULL_BRUSH));
         }
 
         case WM_CTLCOLOREDIT:
+        {
+            HDC dc = reinterpret_cast<HDC>(wParam);
+            SetBkMode(dc, OPAQUE);
+            SetTextColor(dc, kPrimaryText);
+            SetBkColor(dc, RGB(255, 255, 255));
+            return reinterpret_cast<INT_PTR>(editBrush_);
+        }
+
+        case WM_CTLCOLORLISTBOX:
         {
             HDC dc = reinterpret_cast<HDC>(wParam);
             SetBkMode(dc, OPAQUE);
@@ -972,10 +1308,10 @@ private:
                 OpenSettingsWindow();
                 return 0;
             case IdPreviewShort:
-                ShowOverlay(resty::RestKind::Short);
+                ShowOverlay(resty::RestKind::Short, kShortOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Short));
                 return 0;
             case IdPreviewLong:
-                ShowOverlay(resty::RestKind::Long);
+                ShowOverlay(resty::RestKind::Long, kLongOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Long));
                 return 0;
             case IdTrayShowMain:
                 ShowMainWindow();
@@ -1067,19 +1403,30 @@ private:
         {
             HDC dc = reinterpret_cast<HDC>(wParam);
             HWND control = reinterpret_cast<HWND>(lParam);
-            SetBkMode(dc, TRANSPARENT);
+            SetBkMode(dc, OPAQUE);
             if (control == settingsTitleLabel_)
             {
                 SetTextColor(dc, kPrimaryText);
+                SetBkColor(dc, kWindowBackground);
             }
             else
             {
                 SetTextColor(dc, kSecondaryText);
+                SetBkColor(dc, kWindowBackground);
             }
-            return reinterpret_cast<INT_PTR>(GetStockObject(NULL_BRUSH));
+            return reinterpret_cast<INT_PTR>(windowBrush_);
         }
 
         case WM_CTLCOLOREDIT:
+        {
+            HDC dc = reinterpret_cast<HDC>(wParam);
+            SetBkMode(dc, OPAQUE);
+            SetTextColor(dc, kPrimaryText);
+            SetBkColor(dc, RGB(255, 255, 255));
+            return reinterpret_cast<INT_PTR>(editBrush_);
+        }
+
+        case WM_CTLCOLORLISTBOX:
         {
             HDC dc = reinterpret_cast<HDC>(wParam);
             SetBkMode(dc, OPAQUE);
@@ -1094,6 +1441,82 @@ private:
         case WM_COMMAND:
             switch (LOWORD(wParam))
             {
+            case IdRuleList:
+                if (HIWORD(wParam) == LBN_SELCHANGE)
+                {
+                    LoadRuleIntoEditor(static_cast<int>(SendMessageW(ruleListBox_, LB_GETCURSEL, 0, 0)));
+                    return 0;
+                }
+                break;
+            case IdRuleMode:
+                if (HIWORD(wParam) == CBN_SELCHANGE)
+                {
+                    UpdateRuleEditorEnabledState();
+                    return 0;
+                }
+                break;
+            case IdRuleAdd:
+            {
+                resty::ScheduleRule rule;
+                std::wstring error;
+                if (!BuildRuleFromEditor(rule, error))
+                {
+                    MessageBoxW(hwnd, error.c_str(), L"新增失败", MB_ICONWARNING);
+                    return 0;
+                }
+                ruleDrafts_.push_back(rule);
+                SortRuleDrafts();
+                RefreshRuleList();
+                const int index = FindRuleIndex(rule);
+                SendMessageW(ruleListBox_, LB_SETCURSEL, index, 0);
+                LoadRuleIntoEditor(index);
+                return 0;
+            }
+            case IdRuleUpdate:
+            {
+                const int index = static_cast<int>(SendMessageW(ruleListBox_, LB_GETCURSEL, 0, 0));
+                if (index < 0 || index >= static_cast<int>(ruleDrafts_.size()))
+                {
+                    MessageBoxW(hwnd, L"请先在左侧选择一个时间段。", L"更新失败", MB_ICONWARNING);
+                    return 0;
+                }
+                resty::ScheduleRule rule;
+                std::wstring error;
+                if (!BuildRuleFromEditor(rule, error))
+                {
+                    MessageBoxW(hwnd, error.c_str(), L"更新失败", MB_ICONWARNING);
+                    return 0;
+                }
+                ruleDrafts_[index] = rule;
+                SortRuleDrafts();
+                RefreshRuleList();
+                const int sortedIndex = FindRuleIndex(rule);
+                SendMessageW(ruleListBox_, LB_SETCURSEL, sortedIndex, 0);
+                LoadRuleIntoEditor(sortedIndex);
+                return 0;
+            }
+            case IdRuleDelete:
+            {
+                const int index = static_cast<int>(SendMessageW(ruleListBox_, LB_GETCURSEL, 0, 0));
+                if (index < 0 || index >= static_cast<int>(ruleDrafts_.size()))
+                {
+                    MessageBoxW(hwnd, L"请先在左侧选择一个时间段。", L"删除失败", MB_ICONWARNING);
+                    return 0;
+                }
+                ruleDrafts_.erase(ruleDrafts_.begin() + index);
+                RefreshRuleList();
+                if (!ruleDrafts_.empty())
+                {
+                    const int nextIndex = std::min(index, static_cast<int>(ruleDrafts_.size()) - 1);
+                    SendMessageW(ruleListBox_, LB_SETCURSEL, nextIndex, 0);
+                    LoadRuleIntoEditor(nextIndex);
+                }
+                else
+                {
+                    ResetRuleEditor();
+                }
+                return 0;
+            }
             case IdSettingsSave:
                 if (SaveSettingsFromUi())
                 {
@@ -1215,6 +1638,16 @@ private:
             DeleteObject(overlayMessageFont_);
             overlayMessageFont_ = nullptr;
         }
+        if (windowBrush_ != nullptr)
+        {
+            DeleteObject(windowBrush_);
+            windowBrush_ = nullptr;
+        }
+        if (cardBrush_ != nullptr)
+        {
+            DeleteObject(cardBrush_);
+            cardBrush_ = nullptr;
+        }
         if (editBrush_ != nullptr)
         {
             DeleteObject(editBrush_);
@@ -1254,7 +1687,16 @@ private:
     HWND longOpacityEdit_ = nullptr;
     HWND longMessageEdit_ = nullptr;
     HWND longColorEdit_ = nullptr;
-    HWND rulesEdit_ = nullptr;
+    HWND ruleListBox_ = nullptr;
+    HWND ruleKindCombo_ = nullptr;
+    HWND ruleModeCombo_ = nullptr;
+    HWND ruleTimeEdit_ = nullptr;
+    HWND ruleDurationEdit_ = nullptr;
+    HWND ruleDateEdit_ = nullptr;
+    HWND ruleWeekdayChecks_[7] = {};
+    HWND ruleAddButton_ = nullptr;
+    HWND ruleUpdateButton_ = nullptr;
+    HWND ruleDeleteButton_ = nullptr;
     HWND saveButton_ = nullptr;
     HWND closeButton_ = nullptr;
 
@@ -1266,14 +1708,19 @@ private:
     HFONT overlayTitleFont_ = nullptr;
     HFONT overlayCountdownFont_ = nullptr;
     HFONT overlayMessageFont_ = nullptr;
+    HBRUSH windowBrush_ = CreateSolidBrush(kWindowBackground);
+    HBRUSH cardBrush_ = CreateSolidBrush(kCardBackground);
     HBRUSH editBrush_ = CreateSolidBrush(RGB(255, 255, 255));
 
     NOTIFYICONDATAW trayIcon_ = {};
     resty::AppSettings settings_;
+    std::vector<resty::ScheduleRule> ruleDrafts_;
     resty::RestStyle overlayStyle_;
     resty::RestKind overlayKind_ = resty::RestKind::Short;
     __time64_t overlayDeadline_ = 0;
     int overlayDurationSeconds_ = 0;
+    int overlayPlannedDurationMinutes_ = 0;
+    bool overlayPreviewMode_ = false;
     std::wstring lastDueKey_;
     bool isExiting_ = false;
 };
