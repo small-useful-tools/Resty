@@ -285,8 +285,8 @@ private:
         IdSettingsNavRules,
         IdSettingsNavReminder,
         IdSettingsNavSystem,
-        IdSettingsSave,
-        IdSettingsClose,
+        IdShortReminderSave,
+        IdLongReminderSave,
         IdTrayShowMain,
         IdTrayShowSettings,
         IdTrayExit,
@@ -509,7 +509,7 @@ private:
         }
 
         const DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-        RECT rect = { 0, 0, 860, 820 };
+        RECT rect = { 0, 0, 860, 780 };
         AdjustWindowRect(&rect, style, FALSE);
         settingsWindow_ = CreateWindowExW(WS_EX_APPWINDOW,
             kSettingsClassName,
@@ -539,25 +539,27 @@ private:
         openMainWindowCheck_ = CreateWindowExW(0, L"BUTTON", L"启动时打开主页面（默认开启）", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 224, 250, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsOpenMainWindow), instance_, nullptr);
         trayCheck_ = CreateWindowExW(0, L"BUTTON", L"关闭主窗口时最小化到托盘", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 48, 258, 280, 22, hwnd, reinterpret_cast<HMENU>(IdSettingsTray), instance_, nullptr);
 
-        shortGroupBox_ = CreateWindowExW(0, L"BUTTON", L"小休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 150, hwnd, nullptr, instance_, nullptr);
+        shortGroupBox_ = CreateWindowExW(0, L"BUTTON", L"小休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 176, hwnd, nullptr, instance_, nullptr);
         shortOpacityLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 188, 120, 20, hwnd, nullptr, instance_, nullptr);
         shortOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 182, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortOpacity), instance_, nullptr);
         shortColorLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 188, 110, 20, hwnd, nullptr, instance_, nullptr);
         shortColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 182, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortColor), instance_, nullptr);
         shortMessageLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 232, 60, 20, hwnd, nullptr, instance_, nullptr);
         shortMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 226, 622, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsShortMessage), instance_, nullptr);
-        previewShortButton_ = CreateWindowExW(0, L"BUTTON", L"预览小休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 664, 258, 128, 36, hwnd, reinterpret_cast<HMENU>(IdPreviewShort), instance_, nullptr);
-        shortValidationHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 270, 600, 20, hwnd, nullptr, instance_, nullptr);
+        shortValidationHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 262, 600, 20, hwnd, nullptr, instance_, nullptr);
+        previewShortButton_ = CreateWindowExW(0, L"BUTTON", L"预览小休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 500, 284, 120, 36, hwnd, reinterpret_cast<HMENU>(IdPreviewShort), instance_, nullptr);
+        shortReminderSaveButton_ = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 632, 284, 120, 36, hwnd, reinterpret_cast<HMENU>(IdShortReminderSave), instance_, nullptr);
 
-        longGroupBox_ = CreateWindowExW(0, L"BUTTON", L"大休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 320, 792, 150, hwnd, nullptr, instance_, nullptr);
-        longOpacityLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 356, 120, 20, hwnd, nullptr, instance_, nullptr);
-        longOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 350, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongOpacity), instance_, nullptr);
-        longColorLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 356, 110, 20, hwnd, nullptr, instance_, nullptr);
-        longColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 350, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongColor), instance_, nullptr);
-        longMessageLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 400, 60, 20, hwnd, nullptr, instance_, nullptr);
-        longMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 394, 622, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongMessage), instance_, nullptr);
-        previewLongButton_ = CreateWindowExW(0, L"BUTTON", L"预览大休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 664, 426, 128, 36, hwnd, reinterpret_cast<HMENU>(IdPreviewLong), instance_, nullptr);
-        longValidationHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 438, 600, 20, hwnd, nullptr, instance_, nullptr);
+        longGroupBox_ = CreateWindowExW(0, L"BUTTON", L"大休息提醒", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 344, 792, 176, hwnd, nullptr, instance_, nullptr);
+        longOpacityLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"透明度(40-255)", WS_CHILD | WS_VISIBLE, 48, 380, 120, 20, hwnd, nullptr, instance_, nullptr);
+        longOpacityEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 374, 94, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongOpacity), instance_, nullptr);
+        longColorLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"颜色(#RRGGBB)", WS_CHILD | WS_VISIBLE, 294, 380, 110, 20, hwnd, nullptr, instance_, nullptr);
+        longColorEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 406, 374, 128, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongColor), instance_, nullptr);
+        longMessageLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"提示词", WS_CHILD | WS_VISIBLE, 48, 424, 60, 20, hwnd, nullptr, instance_, nullptr);
+        longMessageEdit_ = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 170, 418, 622, 32, hwnd, reinterpret_cast<HMENU>(IdSettingsLongMessage), instance_, nullptr);
+        longValidationHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 48, 454, 600, 20, hwnd, nullptr, instance_, nullptr);
+        previewLongButton_ = CreateWindowExW(0, L"BUTTON", L"预览大休息", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 500, 476, 120, 36, hwnd, reinterpret_cast<HMENU>(IdPreviewLong), instance_, nullptr);
+        longReminderSaveButton_ = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 632, 476, 120, 36, hwnd, reinterpret_cast<HMENU>(IdLongReminderSave), instance_, nullptr);
 
         rulesGroupBox_ = CreateWindowExW(0, L"BUTTON", L"休息规则", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 24, 152, 792, 566, hwnd, nullptr, instance_, nullptr);
         settingsHelpLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"使用下方时间段编辑器维护规则，保存时仍会写回 .resty/data/rest.txt。", WS_CHILD | WS_VISIBLE, 48, 184, 700, 20, hwnd, nullptr, instance_, nullptr);
@@ -597,15 +599,12 @@ private:
 
         settingsPathHintLabel_ = CreateWindowExW(WS_EX_TRANSPARENT, L"STATIC", L"支持每天、每周、固定日期；最终仍会按原文本格式保存。", WS_CHILD | WS_VISIBLE, 48, 658, 320, 20, hwnd, nullptr, instance_, nullptr);
 
-        saveButton_ = CreateWindowExW(0, L"BUTTON", L"保存", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 616, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsSave), instance_, nullptr);
-        closeButton_ = CreateWindowExW(0, L"BUTTON", L"关闭", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW, 720, 738, 92, 40, hwnd, reinterpret_cast<HMENU>(IdSettingsClose), instance_, nullptr);
-
         for (HWND child : { settingsTitleLabel_, settingsSubtitleLabel_, navRulesButton_, navReminderButton_, navSystemButton_, systemGroupBox_, startupCheck_, openMainWindowCheck_, trayCheck_,
-            shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_, previewShortButton_, shortValidationHintLabel_,
-            longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, previewLongButton_, longValidationHintLabel_,
+            shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_, shortValidationHintLabel_, previewShortButton_, shortReminderSaveButton_,
+            longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, longValidationHintLabel_, previewLongButton_, longReminderSaveButton_,
             rulesGroupBox_, settingsHelpLabel_, ruleListLabel_, ruleListBox_, ruleKindLabel_, ruleKindCombo_, ruleModeLabel_, ruleModeCombo_, ruleTimeLabel_, ruleTimeEdit_, ruleDurationLabel_, ruleDurationEdit_, ruleDateLabel_, ruleDateEdit_, ruleWeekdayLabel_,
             ruleWeekdayChecks_[0], ruleWeekdayChecks_[1], ruleWeekdayChecks_[2], ruleWeekdayChecks_[3], ruleWeekdayChecks_[4], ruleWeekdayChecks_[5], ruleWeekdayChecks_[6],
-            ruleAddButton_, ruleUpdateButton_, ruleDeleteButton_, settingsPathHintLabel_, saveButton_, closeButton_ })
+            ruleAddButton_, ruleUpdateButton_, ruleDeleteButton_, settingsPathHintLabel_ })
         {
             SetControlFont(child, baseFont_);
         }
@@ -748,6 +747,48 @@ private:
         InvalidateRect(longValidationHintLabel_, nullptr, TRUE);
     }
 
+    bool TryBuildReminderStyleFromUi(resty::RestKind kind, resty::RestStyle& style, std::wstring& error) const
+    {
+        const HWND opacityEdit = kind == resty::RestKind::Short ? shortOpacityEdit_ : longOpacityEdit_;
+        const HWND colorEdit = kind == resty::RestKind::Short ? shortColorEdit_ : longColorEdit_;
+        const HWND messageEdit = kind == resty::RestKind::Short ? shortMessageEdit_ : longMessageEdit_;
+
+        const std::wstring opacityText = resty::Trim(GetWindowTextString(opacityEdit));
+        const std::wstring colorText = resty::Trim(GetWindowTextString(colorEdit));
+        const std::wstring messageText = resty::Trim(GetWindowTextString(messageEdit));
+
+        if (opacityText.empty())
+        {
+            error = L"透明度不能为空，范围 40 到 255。";
+            return false;
+        }
+
+        try
+        {
+            style.opacity = resty::ClampOpacity(std::stoi(opacityText));
+        }
+        catch (...)
+        {
+            error = L"透明度必须是 40 到 255 之间的整数。";
+            return false;
+        }
+
+        if (!resty::ParseColor(colorText, style.color))
+        {
+            error = L"颜色必须使用 #RRGGBB 格式，例如 #1F3B8A。";
+            return false;
+        }
+
+        if (messageText.empty())
+        {
+            error = L"提示词不能为空。";
+            return false;
+        }
+
+        style.message = messageText;
+        return true;
+    }
+
     void ResetRuleEditor()
     {
         SendMessageW(ruleKindCombo_, CB_SETCURSEL, 0, 0);
@@ -780,7 +821,7 @@ private:
 
         ShowControls({ systemGroupBox_, startupCheck_, openMainWindowCheck_, trayCheck_ }, showSystem);
         ShowControls({ shortGroupBox_, shortOpacityLabel_, shortOpacityEdit_, shortColorLabel_, shortColorEdit_, shortMessageLabel_, shortMessageEdit_,
-            previewShortButton_, shortValidationHintLabel_, longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, previewLongButton_, longValidationHintLabel_ }, showReminder);
+            shortValidationHintLabel_, previewShortButton_, shortReminderSaveButton_, longGroupBox_, longOpacityLabel_, longOpacityEdit_, longColorLabel_, longColorEdit_, longMessageLabel_, longMessageEdit_, longValidationHintLabel_, previewLongButton_, longReminderSaveButton_ }, showReminder);
         ShowControls({ rulesGroupBox_, settingsHelpLabel_, ruleListLabel_, ruleListBox_, ruleKindLabel_, ruleKindCombo_, ruleModeLabel_, ruleModeCombo_, ruleTimeLabel_, ruleTimeEdit_,
             ruleDurationLabel_, ruleDurationEdit_, ruleDateLabel_, ruleDateEdit_, ruleWeekdayLabel_, ruleWeekdayChecks_[0], ruleWeekdayChecks_[1], ruleWeekdayChecks_[2],
             ruleWeekdayChecks_[3], ruleWeekdayChecks_[4], ruleWeekdayChecks_[5], ruleWeekdayChecks_[6], ruleAddButton_, ruleUpdateButton_, ruleDeleteButton_, settingsPathHintLabel_ }, showRules);
@@ -1036,51 +1077,60 @@ private:
         }
     }
 
-    bool SaveSettingsFromUi()
+    bool SaveReminderSettingsFromUi(resty::RestKind kind, bool showFeedback)
     {
-        resty::AppSettings updated = settings_;
-        updated.launchAtStartup = SendMessageW(startupCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
-        updated.openMainWindowOnLaunch = SendMessageW(openMainWindowCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
-        updated.minimizeToTray = SendMessageW(trayCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
-
-        try
+        const wchar_t* label = kind == resty::RestKind::Short ? L"小休息" : L"大休息";
+        resty::RestStyle style;
+        std::wstring error;
+        if (!TryBuildReminderStyleFromUi(kind, style, error))
         {
-            updated.shortRest.opacity = resty::ClampOpacity(std::stoi(resty::Trim(GetWindowTextString(shortOpacityEdit_))));
-            updated.longRest.opacity = resty::ClampOpacity(std::stoi(resty::Trim(GetWindowTextString(longOpacityEdit_))));
-        }
-        catch (...)
-        {
-            MessageBoxW(settingsWindow_, L"透明度必须是 40 到 255 之间的整数。", L"保存失败", MB_ICONWARNING);
+            MessageBoxW(settingsWindow_, (std::wstring(label) + L"设置无效：" + error).c_str(), L"保存失败", MB_ICONWARNING);
             return false;
         }
 
-        updated.shortRest.message = resty::Trim(GetWindowTextString(shortMessageEdit_));
-        updated.longRest.message = resty::Trim(GetWindowTextString(longMessageEdit_));
-        if (updated.shortRest.message.empty() || updated.longRest.message.empty())
+        if (kind == resty::RestKind::Short)
         {
-            MessageBoxW(settingsWindow_, L"提示词不能为空。", L"保存失败", MB_ICONWARNING);
-            return false;
+            settings_.shortRest = style;
         }
-
-        if (!resty::ParseColor(GetWindowTextString(shortColorEdit_), updated.shortRest.color) || !resty::ParseColor(GetWindowTextString(longColorEdit_), updated.longRest.color))
+        else
         {
-            MessageBoxW(settingsWindow_, L"颜色必须使用 #RRGGBB 格式，例如 #1F3B8A。", L"保存失败", MB_ICONWARNING);
-            return false;
+            settings_.longRest = style;
         }
+        resty::SaveSettings(settings_);
+        UpdateHomeDisplay();
+        if (showFeedback)
+        {
+            MessageBoxW(settingsWindow_, (std::wstring(label) + L"设置已保存。").c_str(), L"Resty", MB_ICONINFORMATION);
+        }
+        return true;
+    }
 
+    bool SaveRulesFromDrafts(bool showFeedback)
+    {
         if (ruleDrafts_.empty())
         {
             MessageBoxW(settingsWindow_, L"至少保留一条休息规则。", L"保存失败", MB_ICONWARNING);
             return false;
         }
 
-        updated.rules = ruleDrafts_;
-        settings_ = std::move(updated);
+        settings_.rules = ruleDrafts_;
+        resty::SaveSettings(settings_);
+        UpdateHomeDisplay();
+        if (showFeedback)
+        {
+            MessageBoxW(settingsWindow_, L"休息规则已保存。", L"Resty", MB_ICONINFORMATION);
+        }
+        return true;
+    }
+
+    void SaveSystemSettingsFromUi()
+    {
+        settings_.launchAtStartup = SendMessageW(startupCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+        settings_.openMainWindowOnLaunch = SendMessageW(openMainWindowCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
+        settings_.minimizeToTray = SendMessageW(trayCheck_, BM_GETCHECK, 0, 0) == BST_CHECKED;
         resty::SaveSettings(settings_);
         resty::SetAutoStart(settings_.launchAtStartup);
         UpdateHomeDisplay();
-        MessageBoxW(settingsWindow_, L"设置已保存。", L"Resty", MB_ICONINFORMATION);
-        return true;
     }
 
     void OpenSettingsWindow()
@@ -1142,13 +1192,13 @@ private:
         }
 
         lastDueKey_ = dueKey;
-        ShowOverlay(dueRule->kind, resty::ClampDurationMinutes(dueRule->durationMinutes) * 60, false, resty::ClampDurationMinutes(dueRule->durationMinutes));
+        ShowOverlay(dueRule->kind, resty::ClampDurationMinutes(dueRule->durationMinutes) * 60, false, resty::ClampDurationMinutes(dueRule->durationMinutes), nullptr);
     }
 
-    void ShowOverlay(resty::RestKind kind, int durationSeconds, bool previewMode, int plannedDurationMinutes)
+    void ShowOverlay(resty::RestKind kind, int durationSeconds, bool previewMode, int plannedDurationMinutes, const resty::RestStyle* previewStyleOverride)
     {
         overlayKind_ = kind;
-        overlayStyle_ = kind == resty::RestKind::Short ? settings_.shortRest : settings_.longRest;
+        overlayStyle_ = previewStyleOverride != nullptr ? *previewStyleOverride : (kind == resty::RestKind::Short ? settings_.shortRest : settings_.longRest);
         overlayDurationSeconds_ = std::max(1, durationSeconds);
         overlayPlannedDurationMinutes_ = std::max(1, plannedDurationMinutes);
         overlayPreviewMode_ = previewMode;
@@ -1321,7 +1371,7 @@ private:
             return currentSettingsSection_ == SettingsSection::System;
         }
 
-        return controlId == IdOpenSettings || controlId == IdSettingsSave || controlId == IdPreviewShort || controlId == IdPreviewLong;
+        return controlId == IdOpenSettings || controlId == IdShortReminderSave || controlId == IdLongReminderSave || controlId == IdPreviewShort || controlId == IdPreviewLong;
     }
 
     LRESULT HandleDrawItem(LPARAM lParam) const
@@ -1660,6 +1710,15 @@ private:
             case IdSettingsNavSystem:
                 SetSettingsSection(SettingsSection::System);
                 return 0;
+            case IdSettingsStartup:
+            case IdSettingsOpenMainWindow:
+            case IdSettingsTray:
+                if (HIWORD(wParam) == BN_CLICKED)
+                {
+                    SaveSystemSettingsFromUi();
+                    return 0;
+                }
+                break;
             case IdSettingsShortOpacity:
             case IdSettingsShortColor:
             case IdSettingsLongOpacity:
@@ -1671,10 +1730,34 @@ private:
                 }
                 break;
             case IdPreviewShort:
-                ShowOverlay(resty::RestKind::Short, kShortOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Short));
+            {
+                resty::RestStyle previewStyle;
+                std::wstring error;
+                if (!TryBuildReminderStyleFromUi(resty::RestKind::Short, previewStyle, error))
+                {
+                    MessageBoxW(hwnd, (L"小休息预览失败：" + error).c_str(), L"预览失败", MB_ICONWARNING);
+                    return 0;
+                }
+                ShowOverlay(resty::RestKind::Short, kShortOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Short), &previewStyle);
                 return 0;
+            }
             case IdPreviewLong:
-                ShowOverlay(resty::RestKind::Long, kLongOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Long));
+            {
+                resty::RestStyle previewStyle;
+                std::wstring error;
+                if (!TryBuildReminderStyleFromUi(resty::RestKind::Long, previewStyle, error))
+                {
+                    MessageBoxW(hwnd, (L"大休息预览失败：" + error).c_str(), L"预览失败", MB_ICONWARNING);
+                    return 0;
+                }
+                ShowOverlay(resty::RestKind::Long, kLongOverlaySeconds, true, resty::GetDefaultDurationMinutes(resty::RestKind::Long), &previewStyle);
+                return 0;
+            }
+            case IdShortReminderSave:
+                SaveReminderSettingsFromUi(resty::RestKind::Short, true);
+                return 0;
+            case IdLongReminderSave:
+                SaveReminderSettingsFromUi(resty::RestKind::Long, true);
                 return 0;
             case IdRuleList:
                 if (HIWORD(wParam) == LBN_SELCHANGE)
@@ -1705,6 +1788,7 @@ private:
                 const int index = FindRuleIndex(rule);
                 SendMessageW(ruleListBox_, LB_SETCURSEL, index, 0);
                 LoadRuleIntoEditor(index);
+                SaveRulesFromDrafts(false);
                 return 0;
             }
             case IdRuleUpdate:
@@ -1728,39 +1812,32 @@ private:
                 const int sortedIndex = FindRuleIndex(rule);
                 SendMessageW(ruleListBox_, LB_SETCURSEL, sortedIndex, 0);
                 LoadRuleIntoEditor(sortedIndex);
+                SaveRulesFromDrafts(false);
                 return 0;
             }
             case IdRuleDelete:
             {
+                if (ruleDrafts_.size() <= 1)
+                {
+                    MessageBoxW(hwnd, L"至少保留一条休息规则。", L"删除失败", MB_ICONWARNING);
+                    return 0;
+                }
+
                 const int index = static_cast<int>(SendMessageW(ruleListBox_, LB_GETCURSEL, 0, 0));
                 if (index < 0 || index >= static_cast<int>(ruleDrafts_.size()))
                 {
                     MessageBoxW(hwnd, L"请先在左侧选择一个时间段。", L"删除失败", MB_ICONWARNING);
                     return 0;
                 }
+
                 ruleDrafts_.erase(ruleDrafts_.begin() + index);
                 RefreshRuleList();
-                if (!ruleDrafts_.empty())
-                {
-                    const int nextIndex = std::min(index, static_cast<int>(ruleDrafts_.size()) - 1);
-                    SendMessageW(ruleListBox_, LB_SETCURSEL, nextIndex, 0);
-                    LoadRuleIntoEditor(nextIndex);
-                }
-                else
-                {
-                    ResetRuleEditor();
-                }
+                const int nextIndex = std::min(index, static_cast<int>(ruleDrafts_.size()) - 1);
+                SendMessageW(ruleListBox_, LB_SETCURSEL, nextIndex, 0);
+                LoadRuleIntoEditor(nextIndex);
+                SaveRulesFromDrafts(false);
                 return 0;
             }
-            case IdSettingsSave:
-                if (SaveSettingsFromUi())
-                {
-                    ShowWindow(hwnd, SW_HIDE);
-                }
-                return 0;
-            case IdSettingsClose:
-                ShowWindow(hwnd, SW_HIDE);
-                return 0;
             default:
                 break;
             }
@@ -1955,8 +2032,8 @@ private:
     HWND ruleAddButton_ = nullptr;
     HWND ruleUpdateButton_ = nullptr;
     HWND ruleDeleteButton_ = nullptr;
-    HWND saveButton_ = nullptr;
-    HWND closeButton_ = nullptr;
+    HWND shortReminderSaveButton_ = nullptr;
+    HWND longReminderSaveButton_ = nullptr;
 
     HFONT baseFont_ = nullptr;
     HFONT titleFont_ = nullptr;

@@ -444,7 +444,6 @@ std::wstring RuleToLine(const ScheduleRule& rule)
                 first = false;
             }
         }
-        return line + L"|" + Pad2(rule.hour) + L":" + Pad2(rule.minute);
         return line + L"|" + Pad2(rule.hour) + L":" + Pad2(rule.minute) + L"|" + std::to_wstring(ClampDurationMinutes(rule.durationMinutes));
     }
 
@@ -485,7 +484,6 @@ AppSettings CreateDefaultSettings()
     settings.longRest.color = RGB(127, 29, 29);
     settings.longRest.message = L"离开工位，走动几分钟，真正休息一下。";
 
-    settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 10, 30, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
     settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 10, 30, 5, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
     settings.rules.push_back({ RestKind::Short, RuleMode::Weekly, 15, 30, 5, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
     settings.rules.push_back({ RestKind::Long, RuleMode::Weekly, 12, 0, 15, GetWeekdayBit(1) | GetWeekdayBit(2) | GetWeekdayBit(3) | GetWeekdayBit(4) | GetWeekdayBit(5), 0, 0, 0 });
